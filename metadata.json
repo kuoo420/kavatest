@@ -1,0 +1,6 @@
+{
+  "name": "KAVA 跨店智慧調撥 SaaS 系統",
+  "description": "提供管理者營運儀表板、跨店智慧調撥推薦、門市庫存供需平衡分析、調撥工單追蹤與 CSV 營運報表匯出及 Google Drive 備份的智慧調撥平台。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
