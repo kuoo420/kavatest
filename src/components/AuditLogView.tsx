@@ -13,12 +13,14 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { AuditLog } from '../types';
+import { PresetPeriod } from './ExportModal';
 
 interface AuditLogViewProps {
   logs: AuditLog[];
+  onOpenExportModal?: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
 }
 
-export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
+export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportModal }) => {
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -69,6 +71,17 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
             完整記錄每筆 AI 推薦、門市確認授權、物流單號更新與報表匯出歷史。
           </p>
         </div>
+
+        {onOpenExportModal && (
+          <button
+            onClick={() => onOpenExportModal('quarterly', ['audit_logs'], '系統操作歷程稽核日誌')}
+            className="flex items-center space-x-1.5 bg-white hover:bg-[#FAF6EE] text-[#8C6D3B] border border-[#DED6CF] hover:border-[#C5A059] px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0"
+            title="下載系統操作與稽核日誌 (CSV)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>下載歷程日誌</span>
+          </button>
+        )}
       </div>
 
       {/* Filter and Search Bar */}

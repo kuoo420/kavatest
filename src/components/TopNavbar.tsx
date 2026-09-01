@@ -60,6 +60,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         return '營運儀表板';
       case 'ai_recommendations':
         return 'AI 調貨建議與演算推薦';
+      case 'manual_transfer':
+        return '人工發起跨店調貨';
       case 'transfers':
         return '調貨申請與工單管理';
       case 'inventory':
@@ -225,14 +227,14 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
-        {/* CSV & Google Drive Export Button */}
+        {/* CSV Export Button */}
         <button
           id="btn-export-csv-modal"
           onClick={onOpenExportModal}
           className="flex items-center space-x-1.5 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>匯出報表 / 雲端備份</span>
+          <span>匯出報表</span>
         </button>
 
         {/* User Avatar Circle */}

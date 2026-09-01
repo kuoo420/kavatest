@@ -377,3 +377,130 @@ export function generateAuditLogsCSV(logs: AuditLog[]): string {
 
   return rows.join('\r\n');
 }
+
+export interface MultiExportOptions {
+  selectedReports: string[];
+  startDate: string;
+  endDate: string;
+  presetLabel: string;
+  scopeLabel: string;
+  metrics: DashboardMetrics;
+  cases: TransferCase[];
+  stores: Store[];
+  inventory: StoreInventory[];
+  products: Product[];
+  logs: AuditLog[];
+}
+
+/**
+ * 8. 綜合多工作表/多段落報表生成器 (Multi-Section Report)
+ */
+export function generateMultiSectionReportCSV(options: MultiExportOptions): string {
+  const {
+    selectedReports,
+    startDate,
+    endDate,
+    presetLabel,
+    scopeLabel,
+    metrics,
+    cases,
+    stores,
+    inventory,
+    products,
+    logs,
+  } = options;
+
+  const sections: string[] = [];
+
+  // General Header Metadata
+  const metaRows: string[] = [];
+  metaRows.push(toCsvRow(['══════════════════════════════════════════════════════════════════════════════════']));
+  metaRows.push(toCsvRow(['KAVA 跨店智慧調撥 SaaS 系統 - 綜合營運分析報表']));
+  metaRows.push(toCsvRow(['統計區間', `${startDate} ～ ${endDate} (${presetLabel})`]));
+  metaRows.push(toCsvRow(['檢視範圍', scopeLabel]));
+  metaRows.push(toCsvRow(['產出時間', new Date().toLocaleString('zh-TW')]));
+  metaRows.push(toCsvRow(['包含報表項目數', `${selectedReports.length} 項`]));
+  metaRows.push(toCsvRow(['══════════════════════════════════════════════════════════════════════════════════']));
+  metaRows.push('');
+  sections.push(metaRows.join('\r\n'));
+
+  // 1. 各門市庫存健康分析
+  if (selectedReports.includes('health')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 1 / 門市庫存健康度與 KPI 分析】']));
+    sRows.push(generateDashboardSummaryCSV(metrics, stores, cases));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  // 2. AI 調貨轉化成效
+  if (selectedReports.includes('ai_effectiveness')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 2 / AI 調貨成效與 14 天轉化率追蹤】']));
+    sRows.push(generateAIEffectivenessCSV(cases));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  // 3. 庫存風險與缺貨警示清單
+  if (selectedReports.includes('inventory_risk')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 3 / 低庫存缺貨與滯銷風險排行清單】']));
+    sRows.push(generateInventoryWarningCSV(inventory, stores, products));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  // 4. 跨店調撥工單明細台帳
+  if (selectedReports.includes('transfer_cases')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 4 / 跨店調撥工單明細官方台帳】']));
+    sRows.push(generateTransferCasesCSV(cases, stores));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  // 5. 跨店庫存流向分析
+  if (selectedReports.includes('transfer_flow')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 5 / 跨店庫存流向與物流關係矩陣】']));
+    sRows.push(generateTransferFlowCSV(cases, stores));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  // 6. 門市庫存與承諾矩陣
+  if (selectedReports.includes('inventory_matrix')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 6 / 全通路門市庫存與承諾明細矩陣】']));
+    sRows.push(generateInventoryMatrixCSV(inventory, stores, products));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  // 7. 系統操作歷程日誌
+  if (selectedReports.includes('audit_logs')) {
+    const sRows: string[] = [];
+    sRows.push(toCsvRow(['【工作表 7 / 系統操作歷程與內控稽核日誌】']));
+    sRows.push(generateAuditLogsCSV(logs));
+    sRows.push('');
+    sRows.push(toCsvRow(['--------------------------------------------------------------------------------']));
+    sRows.push('');
+    sections.push(sRows.join('\r\n'));
+  }
+
+  return sections.join('\r\n');
+}
+

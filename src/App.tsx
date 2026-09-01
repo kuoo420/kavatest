@@ -7,7 +7,7 @@ import { ManualTransferView } from './components/ManualTransferView';
 import { TransferManagementView } from './components/TransferManagementView';
 import { InventoryView } from './components/InventoryView';
 import { AuditLogView } from './components/AuditLogView';
-import { ExportModal } from './components/ExportModal';
+import { ExportModal, PresetPeriod } from './components/ExportModal';
 import { TransferDetailModal } from './components/TransferDetailModal';
 import { NewTransferModal } from './components/NewTransferModal';
 import { 
@@ -40,12 +40,35 @@ export default function App() {
   const [logs, setLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
 
   // Modals state
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportModalConfig, setExportModalConfig] = useState<{
+    isOpen: boolean;
+    preset?: PresetPeriod;
+    selectedReports?: string[];
+    contextTitle?: string;
+  }>({
+    isOpen: false,
+    preset: 'monthly',
+    selectedReports: ['health', 'ai_effectiveness', 'inventory_risk', 'transfer_cases'],
+  });
+
   const [selectedCaseForDetail, setSelectedCaseForDetail] = useState<TransferCase | null>(null);
   const [isNewTransferModalOpen, setIsNewTransferModalOpen] = useState(false);
   const [prefilledProduct, setPrefilledProduct] = useState<Product | null>(null);
   const [prefilledTargetStoreId, setPrefilledTargetStoreId] = useState<string | undefined>(undefined);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleOpenExportModal = (
+    preset: PresetPeriod = 'monthly',
+    selectedReports?: string[],
+    contextTitle?: string
+  ) => {
+    setExportModalConfig({
+      isOpen: true,
+      preset,
+      selectedReports: selectedReports || ['health', 'ai_effectiveness', 'inventory_risk', 'transfer_cases'],
+      contextTitle,
+    });
+  };
 
 
   // Append new audit log helper
@@ -446,7 +469,7 @@ export default function App() {
           viewScope={viewScope}
           onChangeViewScope={setViewScope}
           stores={stores}
-          onOpenExportModal={() => setIsExportModalOpen(true)}
+          onOpenExportModal={() => handleOpenExportModal('monthly', ['health', 'ai_effectiveness', 'inventory_risk', 'transfer_cases'])}
           onRefreshData={handleRefresh}
           isRefreshing={isRefreshing}
         />
@@ -463,7 +486,7 @@ export default function App() {
               viewScope={viewScope}
               onNavigateTab={setCurrentTab}
               onSelectCase={setSelectedCaseForDetail}
-              onOpenExportModal={() => setIsExportModalOpen(true)}
+              onOpenExportModal={handleOpenExportModal}
             />
           )}
 
@@ -478,6 +501,7 @@ export default function App() {
               onAdoptRecommendation={handleAdoptAIRecommendation}
               onRejectRecommendation={handleRejectTransfer}
               onSelectCase={setSelectedCaseForDetail}
+              onOpenExportModal={handleOpenExportModal}
             />
           )}
 
@@ -527,6 +551,7 @@ export default function App() {
               onApproveTarget={handleApproveTarget}
               onDispatchCourier={handleDispatchCourier}
               onCompleteTransfer={handleCompleteTransfer}
+              onOpenExportModal={handleOpenExportModal}
             />
           )}
 
@@ -538,19 +563,23 @@ export default function App() {
               userRole={userRole}
               viewScope={viewScope}
               onRequestTransferForProduct={handleRequestTransferForProduct}
+              onOpenExportModal={handleOpenExportModal}
             />
           )}
 
           {currentTab === 'history' && (
-            <AuditLogView logs={logs} />
+            <AuditLogView 
+              logs={logs} 
+              onOpenExportModal={handleOpenExportModal}
+            />
           )}
         </main>
       </div>
 
-      {/* Export & Google Drive Modal */}
+      {/* Export Multi-Section Modal */}
       <ExportModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
+        isOpen={exportModalConfig.isOpen}
+        onClose={() => setExportModalConfig((prev) => ({ ...prev, isOpen: false }))}
         metrics={dashboardMetrics}
         cases={cases}
         stores={stores}
@@ -558,6 +587,9 @@ export default function App() {
         products={products}
         logs={logs}
         onLogExportAction={handleLogExportAction}
+        initialPreset={exportModalConfig.preset}
+        initialSelectedReports={exportModalConfig.selectedReports}
+        contextTitle={exportModalConfig.contextTitle}
       />
 
       {/* Transfer Case Inspection & Approval Modal */}

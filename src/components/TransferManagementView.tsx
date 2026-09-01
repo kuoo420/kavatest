@@ -16,6 +16,7 @@ import {
   PackageCheck
 } from 'lucide-react';
 import { TransferCase, Store, Product, UserRole, ViewScope, TransferStatus } from '../types';
+import { PresetPeriod } from './ExportModal';
 
 interface TransferManagementViewProps {
   cases: TransferCase[];
@@ -29,6 +30,7 @@ interface TransferManagementViewProps {
   onApproveTarget: (caseId: string) => void;
   onDispatchCourier: (caseId: string, courierNumber: string) => void;
   onCompleteTransfer: (caseId: string) => void;
+  onOpenExportModal?: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
 }
 
 export const TransferManagementView: React.FC<TransferManagementViewProps> = ({
@@ -43,6 +45,7 @@ export const TransferManagementView: React.FC<TransferManagementViewProps> = ({
   onApproveTarget,
   onDispatchCourier,
   onCompleteTransfer,
+  onOpenExportModal,
 }) => {
   const [activeStatusFilter, setActiveStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -111,13 +114,26 @@ export const TransferManagementView: React.FC<TransferManagementViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onOpenNewTransferModal}
-          className="flex items-center space-x-2 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-4 py-2.5 rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>發起手動調撥申請</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          {onOpenExportModal && (
+            <button
+              onClick={() => onOpenExportModal('monthly', ['transfer_cases', 'transfer_flow'], '跨店調撥工單明細台帳')}
+              className="flex items-center space-x-1.5 bg-white hover:bg-[#FAF6EE] text-[#8C6D3B] border border-[#DED6CF] hover:border-[#C5A059] px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0"
+              title="下載調撥工單官方明細台帳 (CSV)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>下載調撥台帳</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenNewTransferModal}
+            className="flex items-center space-x-2 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-4 py-2.5 rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-95 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>發起手動調撥申請</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs & Search Bar */}

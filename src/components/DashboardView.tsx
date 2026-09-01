@@ -30,6 +30,7 @@ import {
   ViewScope, 
   NavigationTab 
 } from '../types';
+import { PresetPeriod } from './ExportModal';
 
 interface DashboardViewProps {
   cases: TransferCase[];
@@ -40,7 +41,7 @@ interface DashboardViewProps {
   viewScope: ViewScope;
   onNavigateTab: (tab: NavigationTab) => void;
   onSelectCase: (caseItem: TransferCase) => void;
-  onOpenExportModal: () => void;
+  onOpenExportModal: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
   onQuickInitiateTransfer?: (sku: string, fromStore: string, toStore: string) => void;
 }
 
@@ -296,7 +297,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
                 各門市庫存健康度
               </h3>
-              <span className="text-[11px] text-[#7C756F]">堆疊分析</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onOpenExportModal('daily', ['health'], '各門市庫存健康分析')}
+                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
+                  title="下載各門市庫存健康度報表 (可選日報/月報/季報)"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>下載報表</span>
+                </button>
+                <span className="text-[11px] text-[#7C756F]">堆疊分析</span>
+              </div>
             </div>
             <div className="text-[11px] text-[#7C756F] mb-4">正常／過量／低庫存／滯銷</div>
 
@@ -406,9 +417,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
                 AI 調貨成效漏斗
               </h3>
-              <span className="text-[11px] font-semibold text-[#8C6D3B] bg-[#FAF3E0] px-2 py-0.5 rounded border border-[#EEDB9F]">
-                轉化率 64.9%
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onOpenExportModal('monthly', ['ai_effectiveness'], 'AI 調貨轉化成效分析')}
+                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
+                  title="下載 AI 調貨轉化成效與趨勢報表"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>下載報表</span>
+                </button>
+                <span className="text-[11px] font-semibold text-[#8C6D3B] bg-[#FAF3E0] px-2 py-0.5 rounded border border-[#EEDB9F]">
+                  轉化率 64.9%
+                </span>
+              </div>
             </div>
             <div className="text-[11px] text-[#7C756F] mb-5">建議 → 接受 → 完成 → 有效銷售</div>
 
@@ -517,7 +538,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
             門市 × 商品庫存失衡熱力圖
           </h3>
-          <span className="text-[11px] text-[#7C756F]">即時狀態矩陣</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onOpenExportModal('daily', ['health', 'inventory_risk'], '庫存失衡與熱力圖分析')}
+              className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
+              title="下載品類庫存失衡結構報表"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>下載報表</span>
+            </button>
+            <span className="text-[11px] text-[#7C756F]">即時狀態矩陣</span>
+          </div>
         </div>
         <div className="text-[11px] text-[#7C756F] mb-4">快速辨識各店商品類別的庫存問題</div>
 
@@ -575,12 +606,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
                 低庫存／即將缺貨風險排行
               </h3>
-              <button 
-                onClick={() => onNavigateTab('transfers')}
-                className="text-xs font-semibold text-[#8C6D3B] hover:underline"
-              >
-                發起調撥
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onOpenExportModal('daily', ['inventory_risk'], '庫存風險與缺貨警示清單')}
+                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
+                  title="下載低庫存缺貨與滯銷風險排行清單"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>下載報表</span>
+                </button>
+                <button 
+                  onClick={() => onNavigateTab('transfers')}
+                  className="text-xs font-semibold text-[#8C6D3B] hover:underline"
+                >
+                  發起調撥
+                </button>
+              </div>
             </div>
             <div className="text-[11px] text-[#7C756F] mb-3">依庫存、近 7 日銷量、售罄天數排序</div>
 
@@ -632,7 +673,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
                 跨店庫存流向
               </h3>
-              <span className="text-[11px] text-[#7C756F]">調撥關係網絡</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onOpenExportModal('monthly', ['transfer_flow'], '跨店庫存流向分析')}
+                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
+                  title="下載跨店庫存流向與物流關係報表"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>下載報表</span>
+                </button>
+                <span className="text-[11px] text-[#7C756F]">調撥關係網絡</span>
+              </div>
             </div>
             <div className="text-[11px] text-[#7C756F] mb-4">最近 30 天主要調撥關係</div>
 

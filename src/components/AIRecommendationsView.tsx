@@ -11,9 +11,11 @@ import {
   Sliders,
   BarChart3,
   Building2,
-  Package
+  Package,
+  Download
 } from 'lucide-react';
 import { TransferCase, Store, Product, StoreInventory, UserRole, ViewScope } from '../types';
+import { PresetPeriod } from './ExportModal';
 
 interface AIRecommendationsViewProps {
   cases: TransferCase[];
@@ -25,6 +27,7 @@ interface AIRecommendationsViewProps {
   onAdoptRecommendation: (caseId: string) => void;
   onRejectRecommendation: (caseId: string) => void;
   onSelectCase: (caseItem: TransferCase) => void;
+  onOpenExportModal?: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
 }
 
 export const AIRecommendationsView: React.FC<AIRecommendationsViewProps> = ({
@@ -37,6 +40,7 @@ export const AIRecommendationsView: React.FC<AIRecommendationsViewProps> = ({
   onAdoptRecommendation,
   onRejectRecommendation,
   onSelectCase,
+  onOpenExportModal,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
@@ -78,6 +82,17 @@ export const AIRecommendationsView: React.FC<AIRecommendationsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            {onOpenExportModal && (
+              <button
+                onClick={() => onOpenExportModal('monthly', ['ai_effectiveness', 'transfer_flow'], 'AI 調貨轉化成效與建議清單')}
+                className="flex items-center space-x-2 bg-[#2D343F] hover:bg-[#394250] text-[#F1D892] px-4 py-2.5 rounded-lg text-xs font-semibold transition-all border border-[#D4AF37]/30 shadow-xs"
+                title="下載 AI 推薦成效與轉化率報表"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>下載成效報表</span>
+              </button>
+            )}
+
             <button
               onClick={handleSimulateCalculation}
               disabled={isSimulating}

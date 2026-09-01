@@ -9,9 +9,11 @@ import {
   Layers,
   Filter,
   BarChart3,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { StoreInventory, Product, Store, UserRole, ViewScope } from '../types';
+import { PresetPeriod } from './ExportModal';
 
 interface InventoryViewProps {
   inventory: StoreInventory[];
@@ -20,6 +22,7 @@ interface InventoryViewProps {
   userRole: UserRole;
   viewScope: ViewScope;
   onRequestTransferForProduct: (product: Product, targetStoreId: string) => void;
+  onOpenExportModal?: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -29,6 +32,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   userRole,
   viewScope,
   onRequestTransferForProduct,
+  onOpenExportModal,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -60,6 +64,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             即時監控各門市在架現品、VIP客訂承諾、在途運送與安全庫存水位。
           </p>
         </div>
+
+        {onOpenExportModal && (
+          <button
+            onClick={() => onOpenExportModal('monthly', ['inventory_matrix', 'inventory_risk'], '門市庫存與承諾矩陣')}
+            className="flex items-center space-x-1.5 bg-white hover:bg-[#FAF6EE] text-[#8C6D3B] border border-[#DED6CF] hover:border-[#C5A059] px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0"
+            title="下載全通路庫存與承諾明細矩陣 (CSV)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>下載庫存矩陣</span>
+          </button>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
