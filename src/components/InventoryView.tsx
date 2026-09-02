@@ -9,11 +9,9 @@ import {
   Layers,
   Filter,
   BarChart3,
-  Sparkles,
-  Download
+  Sparkles
 } from 'lucide-react';
 import { StoreInventory, Product, Store, UserRole, ViewScope } from '../types';
-import { PresetPeriod } from './ExportModal';
 
 interface InventoryViewProps {
   inventory: StoreInventory[];
@@ -22,7 +20,6 @@ interface InventoryViewProps {
   userRole: UserRole;
   viewScope: ViewScope;
   onRequestTransferForProduct: (product: Product, targetStoreId: string) => void;
-  onOpenExportModal?: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -32,7 +29,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   userRole,
   viewScope,
   onRequestTransferForProduct,
-  onOpenExportModal,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -53,49 +49,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   return (
-    <div className="p-3.5 sm:p-6 md:p-8 max-w-[1440px] mx-auto space-y-4 sm:space-y-6 animate-in fade-in-50 duration-200">
+    <div className="p-8 max-w-[1440px] mx-auto space-y-6 animate-in fade-in-50 duration-200">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
+          <h1 className="text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
             全通路庫存分佈與承諾鎖定分析矩陣
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
             即時監控各門市在架現品、VIP客訂承諾、在途運送與安全庫存水位。
           </p>
         </div>
-
-        {onOpenExportModal && (
-          <button
-            onClick={() => onOpenExportModal('monthly', ['inventory_matrix', 'inventory_risk'], '門市庫存與承諾矩陣')}
-            className="flex items-center space-x-1.5 bg-white hover:bg-[#FAF6EE] text-[#8C6D3B] border border-[#DED6CF] hover:border-[#C5A059] px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0"
-            title="下載全通路庫存與承諾明細矩陣 (CSV)"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>下載庫存矩陣</span>
-          </button>
-        )}
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-xl border border-[#E8EAEE] p-3 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-thin">
+      <div className="bg-white rounded-xl border border-[#E8EAEE] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-2">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 selectedCategory === cat
                   ? 'bg-[#1C2024] text-white'
                   : 'bg-[#F4F6F8] text-[#4B5563] hover:bg-[#EAEFF5]'
               }`}
             >
-              {cat === 'all' ? '全部商品' : cat}
+              {cat === 'all' ? '全部商品品類' : cat}
             </button>
           ))}
         </div>
 
-        <div className="relative w-full md:w-64 shrink-0">
+        <div className="relative w-full md:w-64">
           <Search className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -107,77 +92,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
-      {/* Mobile Card List (Visible on sm/md) */}
-      <div className="lg:hidden space-y-3">
-        {filteredProducts.map((p) => {
-          const totalAvail = stores.reduce((sum, s) => {
-            const inv = getInventoryRecord(s.id, p.id);
-            return sum + (inv?.availableStock || 0);
-          }, 0);
-
-          return (
-            <div key={p.id} className="bg-white rounded-xl border border-[#E8EAEE] p-4 shadow-xs space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-[#1E293B]">{p.name}</h3>
-                  <div className="text-[11px] text-[#94A3B8] font-mono">{p.sku} · {p.category}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-bold text-[#1E293B]">NT$ {p.price.toLocaleString()}</div>
-                  <div className="text-[10px] text-[#64748B]">全通總量: <strong className="text-[#1E293B]">{totalAvail}</strong> 件</div>
-                </div>
-              </div>
-
-              {/* Grid of Stores */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-gray-100">
-                {stores.map((s) => {
-                  const inv = getInventoryRecord(s.id, p.id);
-                  const available = inv?.availableStock ?? 0;
-                  const committed = inv?.committedStock ?? 0;
-                  const incoming = inv?.incomingStock ?? 0;
-                  const safety = inv?.safetyStock ?? 2;
-                  const isOutOfStock = available <= 0;
-                  const isLowStock = available > 0 && available < safety;
-
-                  return (
-                    <div key={s.id} className="bg-[#F8FAFC] p-2 rounded-lg border border-[#EEF2F6] flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-medium text-[#475569] truncate">{s.shortName}</span>
-                        <span
-                          className={`text-xs font-bold px-1.5 py-0.2 rounded ${
-                            isOutOfStock
-                              ? 'bg-[#FEF2F2] text-[#DC2626]'
-                              : isLowStock
-                              ? 'bg-[#FFFBEB] text-[#D97706]'
-                              : 'bg-[#F0FDF4] text-[#16A34A]'
-                          }`}
-                        >
-                          {available}
-                        </span>
-                      </div>
-                      
-                      <div className="text-[9px] text-[#94A3B8] flex items-center justify-between mt-1">
-                        <span>鎖:{committed} / 途:{incoming}</span>
-                        {isOutOfStock && (
-                          <button
-                            onClick={() => onRequestTransferForProduct(p, s.id)}
-                            className="text-[#8C6D3B] hover:underline font-bold"
-                          >
-                            調入
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Desktop Inventory Matrix Table */}
-      <div className="hidden lg:block bg-white rounded-xl border border-[#E8EAEE] shadow-[0_2px_8px_rgba(0,0,0,0.02)] overflow-hidden">
+      {/* Inventory Matrix Table */}
+      <div className="bg-white rounded-xl border border-[#E8EAEE] shadow-[0_2px_8px_rgba(0,0,0,0.02)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -287,3 +203,4 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     </div>
   );
 };
+

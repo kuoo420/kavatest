@@ -13,14 +13,12 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { AuditLog } from '../types';
-import { PresetPeriod } from './ExportModal';
 
 interface AuditLogViewProps {
   logs: AuditLog[];
-  onOpenExportModal?: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
 }
 
-export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportModal }) => {
+export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -60,33 +58,22 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportMo
   };
 
   return (
-    <div className="p-3.5 sm:p-6 md:p-8 max-w-[1440px] mx-auto space-y-4 sm:space-y-6 animate-in fade-in-50 duration-200">
+    <div className="p-8 max-w-[1440px] mx-auto space-y-6 animate-in fade-in-50 duration-200">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
+          <h1 className="text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
             系統操作歷程與調撥稽核軌跡
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
             完整記錄每筆 AI 推薦、門市確認授權、物流單號更新與報表匯出歷史。
           </p>
         </div>
-
-        {onOpenExportModal && (
-          <button
-            onClick={() => onOpenExportModal('quarterly', ['audit_logs'], '系統操作歷程稽核日誌')}
-            className="flex items-center space-x-1.5 bg-white hover:bg-[#FAF6EE] text-[#8C6D3B] border border-[#DED6CF] hover:border-[#C5A059] px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0"
-            title="下載系統操作與稽核日誌 (CSV)"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>下載歷程日誌</span>
-          </button>
-        )}
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-xl border border-[#E8EAEE] p-3 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-thin">
+      <div className="bg-white rounded-xl border border-[#E8EAEE] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0">
           {[
             { id: 'all', label: '全部歷程' },
             { id: 'AI_ADOPT', label: 'AI 演算法' },
@@ -98,7 +85,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportMo
             <button
               key={tab.id}
               onClick={() => setFilterType(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
                 filterType === tab.id
                   ? 'bg-[#1C2024] text-white'
                   : 'bg-[#F4F6F8] text-[#4B5563] hover:bg-[#EAEFF5]'
@@ -109,7 +96,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportMo
           ))}
         </div>
 
-        <div className="relative w-full md:w-64 shrink-0">
+        <div className="relative w-full md:w-64">
           <Search className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -122,7 +109,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportMo
       </div>
 
       {/* Timeline List */}
-      <div className="bg-white rounded-xl border border-[#E8EAEE] p-4 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white rounded-xl border border-[#E8EAEE] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.02)] space-y-4">
         {filteredLogs.length === 0 ? (
           <div className="py-12 text-center text-[#94A3B8] text-xs">
             查無相關操作歷程記錄
@@ -173,3 +160,4 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs, onOpenExportMo
     </div>
   );
 };
+

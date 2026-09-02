@@ -19,14 +19,7 @@ import {
   Filter,
   BarChart3,
   Layers3,
-  Compass,
-  Gift,
-  Zap,
-  ShoppingBag,
-  HelpCircle,
-  DollarSign,
-  Truck,
-  Award
+  Compass
 } from 'lucide-react';
 import { 
   TransferCase, 
@@ -37,8 +30,6 @@ import {
   ViewScope, 
   NavigationTab 
 } from '../types';
-import { PresetPeriod } from './ExportModal';
-import { POST_TRANSFER_SUCCESS_STORIES } from '../data/mockData';
 
 interface DashboardViewProps {
   cases: TransferCase[];
@@ -49,9 +40,21 @@ interface DashboardViewProps {
   viewScope: ViewScope;
   onNavigateTab: (tab: NavigationTab) => void;
   onSelectCase: (caseItem: TransferCase) => void;
-  onOpenExportModal: (preset?: PresetPeriod, selectedReports?: string[], contextTitle?: string) => void;
+  onOpenExportModal: () => void;
   onQuickInitiateTransfer?: (sku: string, fromStore: string, toStore: string) => void;
 }
+
+const ChartInfo: React.FC<{ text: string }> = ({ text }) => (
+  <div className="relative group shrink-0">
+    <button type="button" aria-label="查看計算方式" className="w-6 h-6 rounded-full border border-[#D8CFC6] bg-white text-[#8C6D3B] flex items-center justify-center hover:bg-[#FAF3E0]">
+      <Info className="w-3.5 h-3.5" />
+    </button>
+    <div className="pointer-events-none absolute right-0 top-8 z-40 hidden group-hover:block group-focus-within:block w-72 max-w-[80vw] rounded-xl bg-[#24211F] text-white text-[11px] leading-relaxed p-3 shadow-xl">
+      <div className="font-bold text-[#E8C683] mb-1">計算方式</div>
+      {text}
+    </div>
+  </div>
+);
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   cases,
@@ -66,7 +69,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onQuickInitiateTransfer,
 }) => {
   const [hoveredStore, setHoveredStore] = useState<string | null>(null);
-  const [selectedFunnelStep, setSelectedFunnelStep] = useState<number | null>(null);
+
+  const scopedInventory = viewScope === 'all' ? inventory : inventory.filter((item) => item.storeId === viewScope);
+  const scopedCases = viewScope === 'all' ? cases : cases.filter((item) => item.sourceStoreId === viewScope || item.targetStoreId === viewScope);
+  const totalAvailableStock = scopedInventory.reduce((sum, item) => sum + item.availableStock, 0);
+  const lowStockSkuCount = new Set(scopedInventory.filter((item) => item.availableStock < item.safetyStock).map((item) => item.productId)).size;
+  const slowMovingSkuCount = new Set(scopedInventory.filter((item) => item.daysOfSupply > 14).map((item) => item.productId)).size;
+  const imbalanceSkuCount = new Set(scopedInventory.filter((item) => item.availableStock < item.safetyStock || item.daysOfSupply > 14).map((item) => item.productId)).size;
+  const aiPendingCount = scopedCases.filter((item) => item.status === 'ai_pending' && item.caseType !== 'omo_fulfillment').length;
 
   // Store Health Data (Percentage distribution: [ok, over, low, stale])
   const healthData: Record<string, [number, number, number, number]> = {
@@ -94,53 +104,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { label: '季節因素', percent: 7 },
   ];
 
-  // AI Funnel Data with Detailed Definitions
+  // Demonstration cohort for the revised AI improvement and transfer outcomes.
   const aiFunnelData = [
-    { 
-      step: '1. AI 建議', 
-      rawName: 'AI 建議',
-      count: 328, 
-      widthPercent: 100, 
-      bg: 'bg-[#211F1D]',
-      tag: '機會點掃描',
-      desc: 'AI 每日 24h 自動掃描全通路進銷存數據，主動抓出可售天數過高（>45天）與斷貨缺口之潛在處方總數。'
-    },
-    { 
-      step: '2. 接受', 
-      rawName: '接受',
-      count: 267, 
-      widthPercent: 87, 
-      bg: 'bg-[#4A4541]',
-      tag: '採納率 81.4%',
-      desc: '總部督導或門市店長認同 AI 診斷，點擊「採納發起工單」未駁回之案件數量。'
-    },
-    { 
-      step: '3. 完成', 
-      rawName: '完成',
-      count: 251, 
-      widthPercent: 74, 
-      bg: 'bg-[#736A63]',
-      tag: '履約率 94.0%',
-      desc: '通過「調出店出庫確認 ➔ 調入店確認 ➔ 物流運送 ➔ 調入店點收驗收入庫」之實體到貨件數。'
-    },
-    { 
-      step: '4. 有效調貨', 
-      rawName: '有效調貨',
-      count: 213, 
-      widthPercent: 61, 
-      bg: 'bg-[#9C8A7B]',
-      tag: '成功售出 84.9%',
-      desc: '最核心指標！商品抵達調入店 14 天內，成功以 100% 正價售出給顧客（非調去繼續放著二次滯銷）。'
-    },
+    { step: '改善建議採用率', count: 267, rate: 81.4, widthPercent: 100, bg: 'bg-[#211F1D]' },
+    { step: '改善後留店率', count: 171, rate: 64.0, widthPercent: 88, bg: 'bg-[#4A5148]' },
+    { step: '改善後轉調撥率', count: 96, rate: 36.0, widthPercent: 76, bg: 'bg-[#736A63]' },
+    { step: 'AI 調撥完成率', count: 88, rate: 91.7, widthPercent: 66, bg: 'bg-[#887868]' },
+    { step: '調撥後銷售有效率', count: 75, rate: 85.2, widthPercent: 56, bg: 'bg-[#9C8A7B]' },
   ];
 
   // Trend Data for AI Effectiveness
   const trendData = [
-    { month: '4月', rate: 76.0 },
-    { month: '5月', rate: 79.0 },
-    { month: '6月', rate: 82.0 },
-    { month: '7月', rate: 81.0 },
-    { month: '8月', rate: 84.9 },
+    { month: '4月', rate: 77.0 },
+    { month: '5月', rate: 79.5 },
+    { month: '6月', rate: 82.1 },
+    { month: '7月', rate: 83.4 },
+    { month: '8月', rate: 85.2 },
   ];
 
   // Heatmap Data: Categories x Stores
@@ -232,62 +211,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
 
-  // Count pending GWP applications
-  const pendingGWPCases = cases.filter(
-    (c) => (c.prescriptionAction === 'gwp_gift' || c.prescriptionStatus === 'gwp_applied') && c.status !== 'completed'
-  );
-
   return (
-    <div className="p-3.5 sm:p-6 md:p-8 max-w-[1440px] mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-200">
-      {/* OMO Ship-from-Store Quick Notice Bar */}
-      <div className="bg-gradient-to-r from-[#1C2024] to-[#2D333B] border border-[#3E454F] rounded-xl px-4 py-3 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-[#C5A059] text-[#16181B] flex items-center justify-center shrink-0 font-bold">
-            <ShoppingBag className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="font-bold text-sm text-[#E5C482] flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              OMO 全通路虛擬庫存池已連線：
-            </span>
-            <p className="text-xs text-[#CBD5E1] mt-0.5">
-              總倉缺貨時，AI 自動尋源指派門市代出貨 (Ship-from-Store)，即時鎖定防超賣並推播 LINE/平板。
-            </p>
-          </div>
-        </div>
-        <button 
-          onClick={() => onNavigateTab('ship_from_store')}
-          className="font-bold text-xs text-[#16181B] bg-gradient-to-r from-[#E5C482] to-[#C5A059] hover:from-[#F0D59B] hover:to-[#D4B06A] px-3.5 py-1.5 rounded-lg shadow-xs shrink-0 text-center flex items-center justify-center gap-1 active:scale-95 transition-all"
-        >
-          <span>進入門市代發工作匣 →</span>
-        </button>
-      </div>
-
-      {/* Pending GWP Application Alert (If any) */}
-      {pendingGWPCases.length > 0 && (
-        <div className="bg-gradient-to-r from-[#ECFDF5] via-[#F0FDF4] to-[#DCFCE7] border border-[#A7F3D0] rounded-xl px-4 py-3 text-xs text-[#065F46] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs animate-in fade-in-50">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-6 h-6 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
-              <Gift className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <span className="font-bold text-[#065F46]">門市 VIP 滿額禮申請待總部覆核：</span>
-              <span className="text-[#047857] ml-1">
-                有 {pendingGWPCases.length} 筆專櫃滿額禮轉化申請（{pendingGWPCases.map(p => p.productName).join('、')}），原店留用不調貨。
-              </span>
-            </div>
-          </div>
-          <button 
-            onClick={() => onNavigateTab('transfers')}
-            className="font-bold text-[#059669] hover:text-[#047857] bg-white px-3 py-1.5 rounded-lg border border-[#86EFAC] shadow-2xs shrink-0 text-center flex items-center justify-center gap-1 active:scale-95 transition-all"
-          >
-            <span>前往工單管制頁審核 →</span>
-          </button>
-        </div>
-      )}
-
-      {/* 營運判讀 Notice Bar */}
-      <div className="bg-[#EEE6DF] border border-[#DDD1C6] rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs text-[#24211F] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+    <div className="p-6 md:p-8 max-w-[1440px] mx-auto space-y-5 animate-in fade-in duration-200">
+      {/* 營運判讀 Notice Bar (Matching provided design) */}
+      <div className="bg-[#EEE6DF] border border-[#DDD1C6] rounded-xl px-4 py-3 text-xs text-[#24211F] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
         <div className="flex items-center space-x-2">
           <span className="font-bold text-[#8C6D3B] flex items-center gap-1 shrink-0">
             <Activity className="w-3.5 h-3.5" />
@@ -301,18 +228,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => onNavigateTab('ai_recommendations')}
           className="font-bold text-[#8C6D3B] hover:text-[#6D5328] shrink-0 text-left sm:text-right flex items-center gap-1"
         >
-          <span>{Math.round(28 * f)} 筆 AI 建議待處理</span>
+          <span>{aiPendingCount} 筆 AI 改善建議待處理</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       </div>
 
-      {/* 6 大核心 KPI 卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
+      {/* 6 大核心 KPI 卡片 (Matching V2 specifications) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {/* KPI 1: 總庫存 */}
         <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-4 shadow-xs hover:border-[#927665] transition-all">
           <div className="text-[11px] text-[#7C756F] font-medium">總庫存</div>
           <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight">
-            {viewScope === 'all' ? '12,480' : Math.round(12480 * f).toLocaleString()}
+            {totalAvailableStock.toLocaleString()}
           </div>
           <div className="text-[11px] font-semibold text-[#718B75] flex items-center gap-0.5">
             <span>↑ 3.2%</span>
@@ -326,7 +253,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="text-[11px] text-[#7C756F] font-medium">低庫存 SKU</div>
           <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight group-hover:text-[#B86A62] transition-colors">
-            {Math.max(1, Math.round(32 * f))}
+            {lowStockSkuCount}
           </div>
           <div className="text-[11px] font-semibold text-[#B86A62]">
             需注意
@@ -337,7 +264,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-4 shadow-xs hover:border-[#718B75] transition-all">
           <div className="text-[11px] text-[#7C756F] font-medium">滯銷 SKU</div>
           <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight">
-            {Math.round(186 * f)}
+            {slowMovingSkuCount}
           </div>
           <div className="text-[11px] font-semibold text-[#718B75]">
             ↓ 12.5%
@@ -348,7 +275,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-4 shadow-xs hover:border-[#718B75] transition-all">
           <div className="text-[11px] text-[#7C756F] font-medium">庫存失衡 SKU</div>
           <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight">
-            {Math.round(74 * f)}
+            {imbalanceSkuCount}
           </div>
           <div className="text-[11px] font-semibold text-[#718B75]">
             ↓ 8.6%
@@ -362,233 +289,168 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="text-[11px] text-[#7C756F] font-medium">AI 待處理</div>
           <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight group-hover:text-[#C99A58] transition-colors">
-            {Math.round(28 * f)}
+            {aiPendingCount}
           </div>
           <div className="text-[11px] font-semibold text-[#C99A58]">
-            {Math.round(18 * f)} 優先
+            待確認
           </div>
         </div>
 
-        {/* KPI 6: 待確認調撥 */}
-        <div 
-          onClick={() => onNavigateTab('transfers')}
-          className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-4 shadow-xs hover:border-[#8C6D3B] transition-all cursor-pointer group"
-        >
-          <div className="text-[11px] text-[#7C756F] font-medium">待確認調撥</div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight group-hover:text-[#8C6D3B] transition-colors">
-            {Math.round(14 * f)}
+        {/* KPI 6: AI 調貨有效率 */}
+        <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-4 shadow-xs hover:border-[#718B75] transition-all">
+          <div className="text-[11px] text-[#7C756F] font-medium">調撥後銷售有效率</div>
+          <div className="text-2xl lg:text-3xl font-extrabold text-[#24211F] my-1 tracking-tight text-[#24211F]">
+            85.2%
           </div>
-          <div className="text-[11px] font-semibold text-[#8C6D3B]">
-            待雙店確認
+          <div className="text-[11px] font-semibold text-[#718B75]">
+            ↑ 3.9%
           </div>
         </div>
       </div>
 
-      {/* 【全新核心亮點】：調貨後成效驗證與正價保全 ROI 分析看板 */}
-      <div className="bg-gradient-to-br from-[#FFFDF9] to-[#FAF6EE] border-2 border-[#EEDB9F] rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#EEDB9F]/80">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <span className="bg-[#8C6D3B] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                調貨後真實成果驗證
-              </span>
-              <span className="text-xs font-bold text-[#8C6D3B] flex items-center gap-1">
-                <Award className="w-3.5 h-3.5" />
-                Post-Transfer Impact & ROI Dashboard
-              </span>
+      {/* Row 1: 各門市庫存健康度 & 庫存失衡原因 (Grid 1.1fr vs 0.9fr) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left: 各門市庫存健康度 */}
+        <div className="lg:col-span-7 bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
+                各門市庫存健康度
+              </h3>
+              <ChartInfo text="以門市 × SKU 為統計單位，依可售天數與安全庫存分為正常、過量、低庫存與滯銷；圖中為示意期間佔比。" />
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-[#24211F] font-serif-heading">
-              調貨後成效與正價保全效益（非紙上談兵，實體售出驗證）
-            </h2>
-            <p className="text-xs text-[#7C756F]">
-              追蹤商品調入新店後的「7~14天動銷消化率」、「正價售出毛利回收」與「對比打折拋售的淨增益」。
-            </p>
+            <div className="text-[11px] text-[#7C756F] mb-4">正常／過量／低庫存／滯銷</div>
+
+            {/* Horizontal Stacked Bar List */}
+            <div className="space-y-3.5">
+              {displayedStores.map((store) => {
+                const data = healthData[store.id] || [70, 15, 10, 5];
+                const [ok, over, low, stale] = data;
+                return (
+                  <div key={store.id} className="grid grid-cols-12 gap-2.5 items-center text-xs">
+                    <span className="col-span-3 font-semibold text-[#24211F] truncate">
+                      {store.name}
+                    </span>
+                    <div className="col-span-8 h-4 rounded-full bg-[#ECE5DE] overflow-hidden flex shadow-inner">
+                      <div 
+                        style={{ width: `${ok}%` }} 
+                        className="h-full bg-[#718B75] hover:opacity-90 transition-all"
+                        title={`正常: ${ok}%`}
+                      />
+                      <div 
+                        style={{ width: `${over}%` }} 
+                        className="h-full bg-[#C99A58] hover:opacity-90 transition-all"
+                        title={`過量: ${over}%`}
+                      />
+                      <div 
+                        style={{ width: `${low}%` }} 
+                        className="h-full bg-[#B86A62] hover:opacity-90 transition-all"
+                        title={`低庫存: ${low}%`}
+                      />
+                      <div 
+                        style={{ width: `${stale}%` }} 
+                        className="h-full bg-[#9F8877] hover:opacity-90 transition-all"
+                        title={`滯銷: ${stale}%`}
+                      />
+                    </div>
+                    <span className="col-span-1 text-right font-mono font-bold text-[#46604A]">
+                      {ok}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2 shrink-0">
-            <button
-              onClick={() => onOpenExportModal('monthly', ['ai_effectiveness', 'transfer_cases'], '調貨成效與ROI分析報表')}
-              className="flex items-center gap-1.5 text-xs font-bold text-[#8C6D3B] bg-white hover:bg-[#FAF6EE] px-3.5 py-2 rounded-xl border border-[#DED6CF] shadow-xs transition-all active:scale-95"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#8C6D3B]" />
-              <span>匯出成效報表</span>
-            </button>
+          {/* Legend */}
+          <div className="flex items-center space-x-4 text-[11px] text-[#7C756F] mt-5 pt-3 border-t border-[#ECE5DE]">
+            <span className="flex items-center gap-1.5">
+              <i className="w-2.5 h-2.5 rounded-xs bg-[#718B75] inline-block"></i>
+              正常
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="w-2.5 h-2.5 rounded-xs bg-[#C99A58] inline-block"></i>
+              過量
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="w-2.5 h-2.5 rounded-xs bg-[#B86A62] inline-block"></i>
+              低庫存
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="w-2.5 h-2.5 rounded-xs bg-[#9F8877] inline-block"></i>
+              滯銷
+            </span>
           </div>
         </div>
 
-        {/* 4 大成效指標卡 */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div className="bg-white p-4 rounded-xl border border-[#EEDB9F] shadow-xs space-y-1">
-            <div className="text-[11px] text-[#7C756F] font-semibold flex items-center gap-1">
-              <DollarSign className="w-3.5 h-3.5 text-[#059669]" />
-              挽回正價毛利總額
+        {/* Right: 庫存失衡原因 */}
+        <div className="lg:col-span-5 bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
+                庫存失衡原因
+              </h3>
+              <ChartInfo text="將每筆庫存失衡案件歸入主要原因，各原因案件數 ÷ 失衡案件總數；合計為 100%。" />
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-[#059669] font-mono">
-              NT$ 421,740
-            </div>
-            <div className="text-[10px] text-[#047857] font-medium">
-              100% 正價售出，免於打折損失
-            </div>
-          </div>
+            <div className="text-[11px] text-[#7C756F] mb-4">依銷售、庫存與補貨資料分析</div>
 
-          <div className="bg-white p-4 rounded-xl border border-[#EEDB9F] shadow-xs space-y-1">
-            <div className="text-[11px] text-[#7C756F] font-semibold flex items-center gap-1">
-              <Truck className="w-3.5 h-3.5 text-[#2563EB]" />
-              投入調撥物流成本
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-[#1E293B] font-mono">
-              NT$ 22,590
-            </div>
-            <div className="text-[10px] text-[#64748B]">
-              平均每件調撥運費 $90~$120
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-[#EEDB9F] shadow-xs space-y-1">
-            <div className="text-[11px] text-[#7C756F] font-semibold flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-[#8C6D3B]" />
-              淨投資回報率 (ROI)
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-[#8C6D3B] font-mono">
-              18.7 倍
-            </div>
-            <div className="text-[10px] text-[#8C6D3B] font-semibold">
-              每投 $1 運費換回 $18.7 淨獲利
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-[#EEDB9F] shadow-xs space-y-1">
-            <div className="text-[11px] text-[#7C756F] font-semibold flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-[#7C3AED]" />
-              平均去化天數縮短
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-[#7C3AED] font-mono">
-              4.2 天
-            </div>
-            <div className="text-[10px] text-[#6D28D9]">
-              原店滯銷 58 天 ➔ 新店迅速完售
-            </div>
-          </div>
-        </div>
-
-        {/* 3 大真實成功調撥案例卡 */}
-        <div className="space-y-2.5 pt-2">
-          <div className="text-xs font-bold text-[#24211F] flex items-center justify-between">
-            <span>🏆 近期跨店調撥成功結案案例（已完售）：</span>
-            <span className="text-[11px] text-[#7C756F]">全通路 100% 正價回收實錄</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {POST_TRANSFER_SUCCESS_STORIES.map((story, idx) => (
-              <div
-                key={idx}
-                className="bg-white p-3.5 rounded-xl border border-[#E6DDD3] shadow-xs space-y-2 hover:border-[#C5A059] transition-all"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-bold text-xs text-[#1E293B]">{story.name}</h3>
-                    <div className="text-[10px] text-[#94A3B8] font-mono">{story.sku} · {story.quantity} 件</div>
+            <div className="space-y-3">
+              {reasonsData.map((r, i) => (
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#3A3530] font-medium">{r.label}</span>
+                    <span className="font-bold text-[#24211F] font-mono">{r.percent}%</span>
                   </div>
-                  <span className="text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#A7F3D0]">
-                    {story.fullPriceRate}
-                  </span>
-                </div>
-
-                <div className="text-[11px] text-[#475569] space-y-0.5 bg-[#F8FAFC] p-2 rounded-lg border border-[#EEF2F6]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#64748B]">調出路徑：</span>
-                    <span className="font-semibold text-[#1E293B]">{story.fromStore} ➔ {story.toStore}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#64748B]">去化速度：</span>
-                    <span className="font-bold text-[#7C3AED]">入庫後 {story.daysToSellOut} 完售</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#64748B]">淨毛利增益：</span>
-                    <span className="font-extrabold text-[#059669]">NT$ +{story.netGain.toLocaleString()} ({story.vsDiscountGain})</span>
+                  <div className="h-2.5 w-full bg-[#EEE7DF] rounded-full overflow-hidden">
+                    <div 
+                      style={{ width: `${r.percent * 2.2}%` }}
+                      className="h-full bg-[#A78D7B] rounded-full transition-all duration-500"
+                    />
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
 
-                <p className="text-[10px] text-[#7C756F] leading-tight">
-                  {story.highlight}
-                </p>
-              </div>
-            ))}
+          <div className="text-[10px] text-[#8C98A6] mt-4 pt-2 border-t border-[#ECE5DE]">
+            大數據每 24 小時自動回溯銷售曲線重新計算權重
           </div>
         </div>
       </div>
 
       {/* Row 2: AI 調貨成效漏斗 & AI 調貨有效率趨勢 (Equal 1fr vs 1fr) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Left: AI 調貨成效漏斗 (帶有完整定義與互動卡片) */}
+        {/* Left: AI 調貨成效漏斗 */}
         <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-bold text-[#24211F] font-serif-heading flex items-center gap-1.5">
-                <span>AI 調貨成效漏斗（4 階段轉化）</span>
-                <span title="點擊各階梯可查看詳細業務定義" className="cursor-pointer">
-                  <HelpCircle className="w-3.5 h-3.5 text-[#8C6D3B]" />
-                </span>
+              <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
+                AI 改善與調撥成效
               </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onOpenExportModal('monthly', ['ai_effectiveness'], 'AI 調貨轉化成效分析')}
-                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
-                  title="下載 AI 調貨轉化成效與趨勢報表"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>下載報表</span>
-                </button>
-                <span className="text-[11px] font-semibold text-[#8C6D3B] bg-[#FAF3E0] px-2 py-0.5 rounded border border-[#EEDB9F]">
-                  終端轉化 64.9%
-                </span>
-              </div>
+              <ChartInfo text="採用率＝採用改善案件數 ÷ 改善建議數；留店與轉調撥率以已採用案件為分母；調撥完成率以轉調撥案件為分母；銷售有效率為完成調撥後 14 天內產生銷售的比例。" />
             </div>
-            <div className="text-[11px] text-[#7C756F] mb-4">
-              點擊下方任一階梯，查看「AI 建議 ➔ 接受 ➔ 完成 ➔ 有效調貨」定義：
-            </div>
+            <div className="text-[11px] text-[#7C756F] mb-5">改善採用 → 留店／轉調撥 → 調撥完成 → 有效銷售</div>
 
             {/* Funnel Layout */}
-            <div className="flex flex-col items-center space-y-2 py-1">
+            <div className="flex flex-col items-center space-y-2.5 py-1">
               {aiFunnelData.map((item, idx) => (
                 <div
                   key={idx}
-                  onClick={() => setSelectedFunnelStep(selectedFunnelStep === idx ? null : idx)}
                   style={{ width: `${item.widthPercent}%` }}
-                  className={`h-9 rounded-lg ${item.bg} text-white px-4 flex items-center justify-between text-xs font-semibold shadow-xs transition-all cursor-pointer hover:scale-[1.01] ${
-                    selectedFunnelStep === idx ? 'ring-2 ring-[#C5A059] ring-offset-2' : ''
-                  }`}
+                  className={`h-9 rounded-lg ${item.bg} text-white px-4 flex items-center justify-between text-xs font-semibold shadow-xs transition-transform hover:scale-[1.01]`}
                 >
-                  <div className="flex items-center space-x-2">
-                    <span>{item.step}</span>
-                    <span className="text-[10px] text-[#D8D0C9] font-normal hidden sm:inline">({item.tag})</span>
-                  </div>
+                  <span>{item.step}</span>
                   <span className="font-mono text-sm font-bold">
-                    {Math.round(item.count * f)} 筆
+                    {Math.round(item.count * f)} 筆 · {item.rate}%
                   </span>
                 </div>
               ))}
             </div>
-
-            {/* Selected Funnel Step Detail Card */}
-            {selectedFunnelStep !== null && (
-              <div className="mt-3 p-3 rounded-xl bg-[#FAF6EE] border border-[#EEDB9F] text-xs text-[#8C6D3B] space-y-1 animate-in fade-in-50">
-                <div className="font-bold flex items-center justify-between">
-                  <span>{aiFunnelData[selectedFunnelStep].step} 業務意義說明：</span>
-                  <span className="text-[10px] bg-[#8C6D3B] text-white px-2 py-0.2 rounded">
-                    {aiFunnelData[selectedFunnelStep].tag}
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#63512A] leading-relaxed">
-                  {aiFunnelData[selectedFunnelStep].desc}
-                </p>
-              </div>
-            )}
           </div>
 
           <div className="text-[10px] text-[#7C756F] mt-4 pt-2 border-t border-[#ECE5DE] flex items-center justify-between">
-            <span>從推薦到店長確認平均耗時 3.2 小時</span>
-            <span className="text-[#8C6D3B] font-semibold">有效調貨率達 84.9%</span>
+            <span>指標分開衡量「改善」與「調撥」成效</span>
+            <span className="text-[#8C6D3B] font-semibold">改善採用率 81.4%</span>
           </div>
         </div>
 
@@ -597,13 +459,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
-                AI 調貨有效率趨勢（近 5 個月）
+                調撥後銷售有效率趨勢
               </h3>
-              <span className="text-[11px] font-bold text-[#718B75] bg-[#E8F2EA] px-2 py-0.5 rounded border border-[#C5DEC8]">
-                最新 84.9%
-              </span>
+              <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-[#718B75] bg-[#E8F2EA] px-2 py-0.5 rounded border border-[#C5DEC8]">最新 85.2%</span><ChartInfo text="當月完成的 AI 調撥中，調撥後 14 天內有產生銷售的案件數 ÷ 當月完成且已滿 14 天觀察期的案件數。" /></div>
             </div>
-            <div className="text-[11px] text-[#7C756F] mb-3">完成調貨後 14 天內產生 100% 正價銷售比例</div>
+            <div className="text-[11px] text-[#7C756F] mb-3">完成調貨後 14 天內產生銷售</div>
 
             {/* SVG Trend Chart */}
             <div className="relative w-full h-[180px] overflow-hidden flex items-center justify-center">
@@ -663,110 +523,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="text-[10px] text-[#7C756F] mt-2 pt-2 border-t border-[#ECE5DE]">
-            近 5 個月有效率持續穩健攀升（從 76.0% 提升至 84.9%）
+            近 5 個月有效率持續穩健攀升（從 77.0% 提升至 85.2%）
           </div>
         </div>
       </div>
 
-      {/* Row 3: 門市 × 商品庫存失衡熱力圖 & 庫存失衡原因 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left: 門市 × 商品庫存失衡熱力圖 */}
-        <div className="lg:col-span-7 bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
-              門市 × 商品庫存失衡熱力圖
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onOpenExportModal('daily', ['health', 'inventory_risk'], '庫存失衡與熱力圖分析')}
-                className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
-                title="下載品類庫存失衡結構報表"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>下載報表</span>
-              </button>
-              <span className="text-[11px] text-[#7C756F]">即時狀態矩陣</span>
-            </div>
-          </div>
-          <div className="text-[11px] text-[#7C756F] mb-4">快速辨識各店商品類別的庫存問題</div>
+      {/* Row 3: 門市 × 商品庫存失衡熱力圖 (Full width card) */}
+      <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-5 shadow-xs">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
+            門市 × 商品庫存失衡熱力圖
+          </h3>
+          <ChartInfo text="以各門市品類下 SKU 的庫存狀態佔比判定：低於安全庫存為低庫存，可售天數過高為過量，長期無銷售為滯銷。" />
+        </div>
+        <div className="text-[11px] text-[#7C756F] mb-4">快速辨識各店商品類別的庫存問題</div>
 
-          {/* Heatmap Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-2 text-xs">
-              <thead>
-                <tr>
-                  <th className="text-left font-semibold text-[#7C756F] pb-2 pl-2 w-24">分類</th>
-                  {displayedStores.map((s) => (
-                    <th key={s.id} className="text-center font-semibold text-[#7C756F] pb-2">
-                      {s.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((cat) => (
-                  <tr key={cat}>
-                    <td className="font-bold text-[#24211F] py-2 pl-2 bg-[#F6F2ED]/50 rounded-lg">
-                      {cat}
-                    </td>
-                    {displayedStores.map((s) => {
-                      const cell = heatStatusMap[cat]?.[s.id] || { status: 'ok', label: '正常', bg: 'bg-[#DFE8DF]', text: 'text-[#46604A]' };
-                      return (
-                        <td
-                          key={s.id}
-                          className={`text-center py-3.5 px-3 rounded-xl font-bold ${cell.bg} ${cell.text} transition-transform hover:scale-105 shadow-xs`}
-                        >
-                          {cell.label}
-                        </td>
-                      );
-                    })}
-                  </tr>
+        {/* Heatmap Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-separate border-spacing-2 text-xs">
+            <thead>
+              <tr>
+                <th className="text-left font-semibold text-[#7C756F] pb-2 pl-2 w-24">分類</th>
+                {displayedStores.map((s) => (
+                  <th key={s.id} className="text-center font-semibold text-[#7C756F] pb-2">
+                    {s.name}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Heatmap Legend */}
-          <div className="flex items-center justify-end space-x-3 text-[11px] mt-4 pt-3 border-t border-[#ECE5DE]">
-            <span className="px-2 py-0.5 rounded bg-[#DFE8DF] text-[#46604A] font-medium">正常：水位平衡</span>
-            <span className="px-2 py-0.5 rounded bg-[#F4E4CA] text-[#8D6227] font-medium">過量：建議調出</span>
-            <span className="px-2 py-0.5 rounded bg-[#F0D7D3] text-[#914B44] font-medium">低庫存：建議補貨</span>
-            <span className="px-2 py-0.5 rounded bg-[#E7DDD4] text-[#70584B] font-medium">滯銷：需促銷流轉</span>
-          </div>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat) => (
+                <tr key={cat}>
+                  <td className="font-bold text-[#24211F] py-2 pl-2 bg-[#F6F2ED]/50 rounded-lg">
+                    {cat}
+                  </td>
+                  {displayedStores.map((s) => {
+                    const cell = heatStatusMap[cat]?.[s.id] || { status: 'ok', label: '正常', bg: 'bg-[#DFE8DF]', text: 'text-[#46604A]' };
+                    return (
+                      <td
+                        key={s.id}
+                        className={`text-center py-3.5 px-3 rounded-xl font-bold ${cell.bg} ${cell.text} transition-transform hover:scale-105 shadow-xs`}
+                      >
+                        {cell.label}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        {/* Right: 庫存失衡原因 */}
-        <div className="lg:col-span-5 bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
-                庫存失衡原因
-              </h3>
-              <span className="text-[11px] text-[#7C756F]">成因歸納</span>
-            </div>
-            <div className="text-[11px] text-[#7C756F] mb-4">依銷售、庫存與補貨資料分析</div>
-
-            <div className="space-y-3">
-              {reasonsData.map((r, i) => (
-                <div key={i} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#3A3530] font-medium">{r.label}</span>
-                    <span className="font-bold text-[#24211F] font-mono">{r.percent}%</span>
-                  </div>
-                  <div className="h-2.5 w-full bg-[#EEE7DF] rounded-full overflow-hidden">
-                    <div 
-                      style={{ width: `${r.percent * 2.2}%` }}
-                      className="h-full bg-[#A78D7B] rounded-full transition-all duration-500"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="text-[10px] text-[#8C98A6] mt-4 pt-2 border-t border-[#ECE5DE]">
-            大數據每 24 小時自動回溯銷售曲線重新計算權重
-          </div>
+        {/* Heatmap Legend */}
+        <div className="flex items-center justify-end space-x-3 text-[11px] mt-4 pt-3 border-t border-[#ECE5DE]">
+          <span className="px-2 py-0.5 rounded bg-[#DFE8DF] text-[#46604A] font-medium">正常：水位平衡</span>
+          <span className="px-2 py-0.5 rounded bg-[#F4E4CA] text-[#8D6227] font-medium">過量：建議調出</span>
+          <span className="px-2 py-0.5 rounded bg-[#F0D7D3] text-[#914B44] font-medium">低庫存：建議補貨</span>
+          <span className="px-2 py-0.5 rounded bg-[#E7DDD4] text-[#70584B] font-medium">滯銷：需促銷流轉</span>
         </div>
       </div>
 
@@ -779,22 +592,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
                 低庫存／即將缺貨風險排行
               </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onOpenExportModal('daily', ['inventory_risk'], '庫存風險與缺貨警示清單')}
-                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
-                  title="下載低庫存缺貨與滯銷風險排行清單"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>下載報表</span>
-                </button>
-                <button 
-                  onClick={() => onNavigateTab('transfers')}
-                  className="text-xs font-semibold text-[#8C6D3B] hover:underline"
-                >
-                  發起調撥
-                </button>
-              </div>
+              <div className="flex items-center gap-2"><ChartInfo text="先篩出可售庫存低於安全水位的 SKU，再依預估售罄天數由短至長排序。" /><button 
+                onClick={() => onNavigateTab('transfers')}
+                className="text-xs font-semibold text-[#8C6D3B] hover:underline"
+              >
+                發起調撥
+              </button></div>
             </div>
             <div className="text-[11px] text-[#7C756F] mb-3">依庫存、近 7 日銷量、售罄天數排序</div>
 
@@ -835,7 +638,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="text-[10px] text-[#7C756F] mt-4 pt-2 border-t border-[#ECE5DE]">
-            系統已自動在「AI 調貨建議」中為上述品項生成建議調撥單
+            系統會先判斷是否已有訂單：實單進入 OMO 履約，預測需求才進入 AI 改善或調撥建議
           </div>
         </div>
 
@@ -846,17 +649,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-bold text-[#24211F] font-serif-heading">
                 跨店庫存流向
               </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onOpenExportModal('monthly', ['transfer_flow'], '跨店庫存流向分析')}
-                  className="flex items-center gap-1 text-[11px] text-[#8C6D3B] hover:text-[#785D31] bg-[#FAF3E0] hover:bg-[#F3E8CE] px-2.5 py-1 rounded-lg border border-[#EADBBD] transition-all font-semibold shadow-xs"
-                  title="下載跨店庫存流向與物流關係報表"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>下載報表</span>
-                </button>
-                <span className="text-[11px] text-[#7C756F]">調撥關係網絡</span>
-              </div>
+              <ChartInfo text="匯總最近 30 天已建立的一般跨店調撥，依「來源門市 → 接收門市」加總數量；OMO 顧客履約不納入跨店流向。" />
             </div>
             <div className="text-[11px] text-[#7C756F] mb-4">最近 30 天主要調撥關係</div>
 
@@ -969,3 +762,4 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     </div>
   );
 };
+

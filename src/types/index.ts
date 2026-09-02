@@ -7,7 +7,6 @@ export type NavigationTab =
   | 'ai_recommendations' 
   | 'manual_transfer'
   | 'transfers' 
-  | 'ship_from_store'
   | 'inventory' 
   | 'history';
 
@@ -46,6 +45,7 @@ export interface StoreInventory {
 
 export type TransferStatus = 
   | 'ai_pending'        // AI 建議待採用
+  | 'omo_pending'       // OMO 訂單待履約門市接單
   | 'waiting_source'     // 待調出店確認
   | 'waiting_target'     // 待調入店確認
   | 'both_confirmed'    // 雙方已確認 (準備發貨)
@@ -63,10 +63,28 @@ export interface TransferCase {
   sourceStoreId: string; // 調出店
   targetStoreId: string; // 調入店
   status: TransferStatus;
+  caseType?: 'transfer' | 'web_restock' | 'omo_fulfillment';
+  orderNumber?: string;
+  orderChannel?: string;
+  deliveryMethod?: string;
+  fulfillmentReason?: string;
+  fulfillmentCandidates?: Array<{
+    storeId: string;
+    sellableStock: number;
+    estimatedDelivery: string;
+    estimatedShippingFee: number;
+    workload: string;
+    selected: boolean;
+  }>;
   pendingStoreId?: string; // 目前待辦店家
   isAiGenerated: boolean;
   aiScore?: number; // AI 匹配信心度 (e.g. 96%)
   aiRationale?: string; // AI 調撥原因解釋
+  aiDecisionStage?: 'priority_improvement' | 'observing' | 'retain' | 'transfer';
+  improvementAction?: string;
+  improvementObservationDays?: number;
+  improvementStartedAt?: string;
+  improvementResult?: string;
   transferReason: string; // 原因 (如: 門市缺貨預警、顧客專案預訂、熱銷補貨)
   sourceConfirmed: boolean;
   sourceConfirmedAt?: string;
@@ -76,33 +94,6 @@ export interface TransferCase {
   createdAt: string;
   updatedAt: string;
   remarks?: string;
-
-  // AI 庫存處方籤相關欄位 (連鎖店價格一致性規範)
-  prescriptionStatus?: 'pending' | 'vm_observing' | 'gwp_applied' | 'transfer_initiated' | 'skipped';
-  prescriptionAction?: 'vm_display' | 'gwp_gift' | 'transfer' | 'none';
-  vmGuidance?: string; // 視覺陳列調整指引
-  salesPitchGuidance?: string; // 門市成套疊戴話術
-  gwpGuidance?: string; // VIP滿額贈禮轉化指引
-  observationDaysRemaining?: number; // 觀察期剩餘天數 (預設 7 天)
-  diagnosis?: string; // 庫存診斷說明
-  vmPhotoProofUrl?: string; // 陳列調整佐證照片 (Base64 或 URL)
-  vmVerifiedAt?: string; // 陳列拍照驗證時間戳
-  vmVerifiedBy?: string; // 拍照驗證人員
-  salesPitchDetail?: {
-    recommendedPairSku?: string; // 推薦搭售熱銷品 SKU
-    recommendedPairName?: string; // 推薦搭售熱銷品名稱
-    styleLogic?: string; // 美學與層次搭配邏輯
-    targetPersona?: string; // 目標客群與痛點
-    iceBreakerScript?: string; // 破冰推薦句
-    priceOvercomeScript?: string; // 價格與正價價值化解句
-    crossSellRateLift?: string; // 歷史連帶結帳率提升指標
-  };
-  unitEconomics?: {
-    fullPrice: number;
-    transferCost: number;
-    expectedNetMargin: number;
-    fullPriceRevenue: number;
-  };
 }
 
 export interface AuditLog {
@@ -110,25 +101,7 @@ export interface AuditLog {
   timestamp: string;
   operator: string;
   roleTitle: string;
-  actionType: 
-    | 'AI_ADOPT' 
-    | 'TRANSFER_CREATE' 
-    | 'STORE_APPROVE' 
-    | 'STORE_REJECT' 
-    | 'DISPATCH' 
-    | 'RECEIVE' 
-    | 'EXPORT_CSV' 
-    | 'DRIVE_BACKUP'
-    | 'PRESCRIPTION_VM'
-    | 'VM_OBSERVE_RESOLVE'
-    | 'VM_OBSERVE_ESCALATE'
-    | 'PRESCRIPTION_GWP'
-    | 'GWP_HQ_APPROVE'
-    | 'GWP_HQ_REJECT'
-    | 'PRESCRIPTION_TRANSFER'
-    | 'ECOMMERCE_ORDER_ROUTED'
-    | 'STORE_SHIP_PICKED'
-    | 'STORE_SHIP_DISPATCHED';
+  actionType: 'AI_ADOPT' | 'TRANSFER_CREATE' | 'STORE_APPROVE' | 'STORE_REJECT' | 'DISPATCH' | 'RECEIVE' | 'EXPORT_CSV' | 'DRIVE_BACKUP';
   title: string;
   details: string;
   targetId?: string;
@@ -143,34 +116,4 @@ export interface DashboardMetrics {
   activeSkuCount: number;
   storePendingMap: Record<string, number>;
 }
-
-export type ShipOrderStatus = 'pending_pick' | 'picked_packed' | 'dispatched' | 'delivered';
-
-export interface ShipFromStoreOrder {
-  id: string;
-  orderNumber: string; // e.g. EC-20260902-881
-  customerName: string; // e.g. 王*華
-  customerPhone: string;
-  shippingAddress: string;
-  productId: string;
-  productSku: string;
-  productName: string;
-  quantity: number;
-  price: number;
-  assignedStoreId: string; // e.g. S01 一中店
-  assignedReason: string; // e.g. 總倉缺貨(0件)，AI 智慧尋源：西門店滯銷優先消呆 / 一中店地緣最近
-  status: ShipOrderStatus;
-  createdAt: string;
-  dueTime: string; // e.g. 2 小時內出貨
-  courier: string;
-  trackingNumber?: string;
-  notificationSent: {
-    ipadPos: boolean;
-    lineNotify: boolean;
-    sms: boolean;
-  };
-  pickedAt?: string;
-  dispatchedAt?: string;
-}
-
 

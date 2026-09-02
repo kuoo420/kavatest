@@ -7,8 +7,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Building2,
-  UserCheck,
-  Menu
+  UserCheck
 } from 'lucide-react';
 import { UserRole, ViewScope, Store, NavigationTab } from '../types';
 
@@ -22,7 +21,6 @@ interface TopNavbarProps {
   onOpenExportModal: () => void;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
-  onToggleMobileMenu?: () => void;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
@@ -35,7 +33,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onOpenExportModal,
   onRefreshData,
   isRefreshing = false,
-  onToggleMobileMenu,
 }) => {
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [scopeDropdownOpen, setScopeDropdownOpen] = useState(false);
@@ -62,13 +59,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       case 'dashboard':
         return '營運儀表板';
       case 'ai_recommendations':
-        return 'AI 庫存處方與調撥';
-      case 'manual_transfer':
-        return '人工跨店調貨';
+        return 'AI 庫存改善建議';
       case 'transfers':
         return '調貨申請與工單管理';
-      case 'ship_from_store':
-        return '門市代發貨 (Ship-from-Store)';
       case 'inventory':
         return '全通路庫存與承諾分析';
       case 'history':
@@ -99,39 +92,26 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   return (
     <header 
       id="kava-top-navbar"
-      className="bg-white border-b border-[#E7E9ED] px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+      className="bg-white border-b border-[#E7E9ED] px-4 sm:px-6 lg:px-8 py-3 flex flex-col xl:flex-row xl:items-center justify-between gap-3 sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
     >
-      {/* Left Title & Mobile Hamburger */}
-      <div className="flex items-center space-x-3 min-w-0">
-        {onToggleMobileMenu && (
-          <button
-            onClick={onToggleMobileMenu}
-            className="lg:hidden p-2 -ml-1 text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-lg transition-colors"
-            title="開啟功能選單"
-            aria-label="開啟選單"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-
-        <div className="min-w-0">
-          <div className="text-[11px] sm:text-xs text-[#7B8694] font-medium flex items-center gap-1.5 mb-0.5 truncate">
-            <span className="truncate">{getRoleLabel(userRole)}</span>
-            <span className="text-[#C2C9D1]">|</span>
-            <span className="truncate">檢視：{getScopeLabel(viewScope)}</span>
-          </div>
-          <h2 className="text-base sm:text-lg lg:text-xl font-bold text-[#1F2633] tracking-tight font-serif-heading truncate">
-            {getTabTitle()}
-          </h2>
+      {/* Left Title & Breadcrumbs */}
+      <div className="w-full xl:w-auto min-w-0">
+        <div className="text-xs text-[#7B8694] font-medium flex items-center gap-1.5 mb-0.5">
+          <span>{getRoleLabel(userRole)}</span>
+          <span className="text-[#C2C9D1]">|</span>
+          <span>目前檢視：{getScopeLabel(viewScope)}</span>
         </div>
+        <h2 className="text-base sm:text-xl font-bold text-[#1F2633] tracking-tight font-serif-heading truncate">
+          {getTabTitle()}
+        </h2>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+      <div className="w-full xl:w-auto flex flex-wrap items-center gap-2 sm:gap-3.5 overflow-visible pb-0.5 xl:pb-0">
         {/* Central Data Sync Status Badge */}
-        <div className="hidden xl:flex items-center space-x-2 text-xs font-medium text-[#1E293B] bg-[#F4F6F8] px-3 py-1.5 rounded-full border border-[#E2E6EC]">
+        <div className="hidden lg:flex items-center space-x-2 text-xs font-medium text-[#1E293B] bg-[#F4F6F8] px-3 py-1.5 rounded-full border border-[#E2E6EC]">
           <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse"></span>
-          <span>中央連線正常</span>
+          <span>中央資料已同步</span>
           {onRefreshData && (
             <button
               onClick={onRefreshData}
@@ -148,15 +128,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <button
             id="role-selector-btn"
             onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-            className="flex items-center space-x-1.5 sm:space-x-2 bg-white hover:bg-[#F9FAFB] text-[#374151] border border-[#D5DAE1] rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all shadow-xs"
+            className="shrink-0 flex items-center space-x-2 bg-white hover:bg-[#F9FAFB] text-[#374151] border border-[#D5DAE1] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shadow-sm"
           >
-            <span className="hidden sm:inline text-[#6B7280]">角色</span>
-            <span className="font-semibold text-[#1F2937] max-w-[90px] sm:max-w-none truncate">{getRoleLabel(userRole)}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] shrink-0" />
+            <span className="text-[#6B7280]">使用者角色</span>
+            <span className="font-semibold text-[#1F2937]">{getRoleLabel(userRole)}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-[#6B7280]" />
           </button>
 
           {roleDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-56 sm:w-64 bg-white rounded-xl shadow-xl border border-[#E5E7EB] py-1.5 z-50 animate-in fade-in-50 duration-100 max-h-[80vh] overflow-y-auto">
+            <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-[#E5E7EB] py-1.5 z-50 animate-in fade-in-50 duration-100">
               <div className="px-3 py-1.5 text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider border-b border-gray-100 flex items-center gap-1.5">
                 <UserCheck className="w-3.5 h-3.5 text-[#C5A059]" />
                 切換模擬角色
@@ -170,7 +150,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   userRole === 'admin' ? 'bg-[#FAF6EE] text-[#977334] font-bold' : 'text-[#374151]'
                 }`}
               >
-                <span>總管理者 (全通路)</span>
+                <span>總管理者 (全通路監控)</span>
                 {userRole === 'admin' && <span className="text-[10px] bg-[#C5A059]/20 text-[#846328] px-1.5 py-0.5 rounded">目前</span>}
               </button>
               <div className="my-1 border-t border-gray-100"></div>
@@ -201,15 +181,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <button
             id="scope-selector-btn"
             onClick={() => setScopeDropdownOpen(!scopeDropdownOpen)}
-            className="flex items-center space-x-1.5 sm:space-x-2 bg-white hover:bg-[#F9FAFB] text-[#374151] border border-[#D5DAE1] rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all shadow-xs"
+            className="shrink-0 flex items-center space-x-2 bg-white hover:bg-[#F9FAFB] text-[#374151] border border-[#D5DAE1] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shadow-sm"
           >
-            <span className="hidden sm:inline text-[#6B7280]">範圍</span>
-            <span className="font-semibold text-[#1F2937] max-w-[80px] sm:max-w-none truncate">{getScopeLabel(viewScope)}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] shrink-0" />
+            <span className="text-[#6B7280]">檢視範圍</span>
+            <span className="font-semibold text-[#1F2937]">{getScopeLabel(viewScope)}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-[#6B7280]" />
           </button>
 
           {scopeDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-52 sm:w-56 bg-white rounded-xl shadow-xl border border-[#E5E7EB] py-1.5 z-50 max-h-[80vh] overflow-y-auto">
+            <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-[#E5E7EB] py-1.5 z-50">
               <div className="px-3 py-1.5 text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider border-b border-gray-100 flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-[#C5A059]" />
                 篩選數據範圍
@@ -245,21 +225,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
-        {/* CSV Export Button */}
+        {/* CSV & Google Drive Export Button */}
         <button
           id="btn-export-csv-modal"
           onClick={onOpenExportModal}
-          className="flex items-center space-x-1.5 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-all active:scale-95 shrink-0"
+          className="shrink-0 flex items-center space-x-1.5 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95"
         >
           <Download className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">匯出報表</span>
-          <span className="sm:hidden">匯出</span>
+          <span>匯出報表 / 雲端備份</span>
         </button>
 
         {/* User Avatar Circle */}
         <div 
           title={`當前登入身分：${getRoleLabel(userRole)}`}
-          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#181C20] text-[#E8C683] flex items-center justify-center font-bold text-xs border border-[#C5A059] shadow-xs select-none shrink-0"
+          className="w-8 h-8 rounded-full bg-[#181C20] text-[#E8C683] flex items-center justify-center font-bold text-xs border border-[#C5A059] shadow-sm select-none"
         >
           {getAvatarChar()}
         </div>

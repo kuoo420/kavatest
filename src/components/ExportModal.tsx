@@ -1,22 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   Download, 
+  CloudUpload, 
   FileSpreadsheet, 
   CheckCircle2, 
-  Calendar, 
-  Layers, 
-  Sparkles, 
-  TrendingUp, 
-  ArrowLeftRight, 
-  ShieldAlert, 
-  Clock, 
-  Building2, 
-  FileCheck,
-  Package,
-  History,
-  CheckSquare,
-  Square
+  AlertCircle, 
+  ExternalLink,
+  Loader2,
+  Table,
+  Building2,
+  Calendar,
+  Layers,
+  Sparkles,
+  TrendingUp,
+  ArrowLeftRight
 } from 'lucide-react';
 import { 
   TransferCase, 
@@ -29,7 +27,6 @@ import {
 } from '../types';
 import { 
   downloadCSV, 
-  generateMultiSectionReportCSV,
   generateDashboardSummaryCSV, 
   generateInventoryWarningCSV,
   generateAIEffectivenessCSV,
@@ -38,17 +35,7 @@ import {
   generateInventoryMatrixCSV, 
   generateAuditLogsCSV 
 } from '../services/csvExport';
-
-export type PresetPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'custom';
-
-export interface ReportOption {
-  key: string;
-  name: string;
-  code: string;
-  recommendedFor: string;
-  description: string;
-  icon: any;
-}
+import { uploadCsvToGoogleDrive, DriveUploadResult } from '../services/googleDrive';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -60,10 +47,16 @@ interface ExportModalProps {
   products: Product[];
   logs: AuditLog[];
   onLogExportAction: (reportName: string, destination: 'LOCAL_CSV' | 'GOOGLE_DRIVE') => void;
-  initialPreset?: PresetPeriod;
-  initialSelectedReports?: string[];
-  contextTitle?: string;
 }
+
+export type ReportType = 
+  | 'dashboard_summary' 
+  | 'inventory_warning' 
+  | 'ai_effectiveness' 
+  | 'transfer_flow' 
+  | 'transfer_cases' 
+  | 'inventory_matrix' 
+  | 'audit_logs';
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
@@ -75,154 +68,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   products,
   logs,
   onLogExportAction,
-  initialPreset = 'monthly',
-  initialSelectedReports,
-  contextTitle,
 }) => {
-  // Available report types
-  const reportOptions: ReportOption[] = [
-    {
-      key: 'health',
-      name: '各門市庫存健康與 KPI 分析',
-      code: 'RPT-01',
-      recommendedFor: '日報 / 週報',
-      description: '今日各門市在庫量、正常/過量/低庫存/滯銷百分比結構與失衡成因歸納。',
-      icon: Layers,
-    },
-    {
-      key: 'ai_effectiveness',
-      name: 'AI 調貨轉化成效與趨勢',
-      code: 'RPT-02',
-      recommendedFor: '月報 / 季報',
-      description: 'AI 推薦漏斗（建議→接受→完成）、調貨後 14 天內銷售轉化率與近 5 月成效趨勢。',
-      icon: TrendingUp,
-    },
-    {
-      key: 'inventory_risk',
-      name: '庫存風險與缺貨警示清單',
-      code: 'RPT-03',
-      recommendedFor: '日報 (緊急處理)',
-      description: '低庫存即將斷貨 (DOS < 2天) 與嚴重滯銷 SKU 清單及處置建議。',
-      icon: ShieldAlert,
-    },
-    {
-      key: 'transfer_cases',
-      name: '跨店調撥工單明細官方台帳',
-      code: 'RPT-04',
-      recommendedFor: '月報 (對帳盤點)',
-      description: '完整記錄每筆調撥單之建立時間、雙店店長確認時間、物流單號與點收紀錄。',
-      icon: FileCheck,
-    },
-    {
-      key: 'transfer_flow',
-      name: '跨店庫存流向與物流關係矩陣',
-      code: 'RPT-05',
-      recommendedFor: '月報 (物流結算)',
-      description: '各門市點對點調運件數矩陣與流向分析，供月結運費與商圈供需偏好檢討。',
-      icon: ArrowLeftRight,
-    },
-    {
-      key: 'inventory_matrix',
-      name: '全通路門市庫存與承諾矩陣',
-      code: 'RPT-06',
-      recommendedFor: '月報 (庫存總檢)',
-      description: '全門市所有 SKU 之在架可用、客訂承諾、在途調入與安全庫存水位。',
-      icon: Package,
-    },
-    {
-      key: 'audit_logs',
-      name: '系統操作歷程與內控稽核日誌',
-      code: 'RPT-07',
-      recommendedFor: '季報 (內控稽核)',
-      description: '全季度所有人員操作行為、AI 推薦採用、店長授權簽核與報表下載紀錄。',
-      icon: History,
-    },
-  ];
-
-  const [preset, setPreset] = useState<PresetPeriod>(initialPreset);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [selectedReports, setSelectedReports] = useState<string[]>(
-    initialSelectedReports || ['health', 'ai_effectiveness', 'inventory_risk', 'transfer_cases']
-  );
+  const [selectedReport, setSelectedReport] = useState<ReportType>('dashboard_summary');
   const [selectedScope, setSelectedScope] = useState<ViewScope>('all');
-  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
-
-  // Helper to calculate preset dates
-  const calculatePresetDates = (p: PresetPeriod) => {
-    const today = new Date(2026, 8, 1); // 2026-09-01 baseline
-    const formatDate = (d: Date) => {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const end = formatDate(today);
-    let start = end;
-
-    if (p === 'daily') {
-      start = end;
-    } else if (p === 'weekly') {
-      const w = new Date(today);
-      w.setDate(w.getDate() - 6);
-      start = formatDate(w);
-    } else if (p === 'monthly') {
-      const m = new Date(today);
-      m.setDate(m.getDate() - 29);
-      start = formatDate(m);
-    } else if (p === 'quarterly') {
-      const q = new Date(today);
-      q.setDate(q.getDate() - 89);
-      start = formatDate(q);
-    }
-
-    return { start, end };
-  };
-
-  // Sync preset on initial open or change
-  useEffect(() => {
-    if (initialSelectedReports && initialSelectedReports.length > 0) {
-      setSelectedReports(initialSelectedReports);
-    }
-  }, [initialSelectedReports]);
-
-  useEffect(() => {
-    if (preset !== 'custom') {
-      const { start, end } = calculatePresetDates(preset);
-      setStartDate(start);
-      setEndDate(end);
-    }
-  }, [preset]);
+  const [isUploadingToDrive, setIsUploadingToDrive] = useState<boolean>(false);
+  const [driveResult, setDriveResult] = useState<DriveUploadResult | null>(null);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
   if (!isOpen) return null;
-
-  const handlePresetChange = (newPreset: PresetPeriod) => {
-    setPreset(newPreset);
-    if (newPreset !== 'custom') {
-      const { start, end } = calculatePresetDates(newPreset);
-      setStartDate(start);
-      setEndDate(end);
-    }
-  };
-
-  const handleToggleReport = (key: string) => {
-    setSelectedReports((prev) => {
-      if (prev.includes(key)) {
-        return prev.filter((k) => k !== key);
-      } else {
-        return [...prev, key];
-      }
-    });
-  };
-
-  const handleSelectAll = () => {
-    setSelectedReports(reportOptions.map((r) => r.key));
-  };
-
-  const handleClearAll = () => {
-    setSelectedReports([]);
-  };
 
   // Filter cases & inventory based on selected scope
   const scopedCases = cases.filter((c) => {
@@ -235,279 +88,277 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return inv.storeId === selectedScope;
   });
 
-  const getScopeName = () => {
-    if (selectedScope === 'all') return '全通路 (全部門市)';
-    const s = stores.find((st) => st.id === selectedScope);
-    return s ? `${s.name} (${s.code})` : selectedScope;
-  };
-
-  const getPresetLabel = () => {
-    switch (preset) {
-      case 'daily':
-        return '今日 (日報)';
-      case 'weekly':
-        return '近 7 天 (週報)';
-      case 'monthly':
-        return '近 30 天 (月報)';
-      case 'quarterly':
-        return '近 90 天 (季報)';
+  const getReportCSV = (type: ReportType): { content: string; filename: string } => {
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    switch (type) {
+      case 'dashboard_summary':
+        return {
+          content: generateDashboardSummaryCSV(metrics, stores, scopedCases),
+          filename: `KAVA_營運摘要報表_${dateStr}.csv`,
+        };
+      case 'inventory_warning':
+        return {
+          content: generateInventoryWarningCSV(scopedInventory, stores, products),
+          filename: `KAVA_庫存警示與風險排行報表_${dateStr}.csv`,
+        };
+      case 'ai_effectiveness':
+        return {
+          content: generateAIEffectivenessCSV(scopedCases),
+          filename: `KAVA_AI調貨成效與轉化率報表_${dateStr}.csv`,
+        };
+      case 'transfer_flow':
+        return {
+          content: generateTransferFlowCSV(scopedCases, stores),
+          filename: `KAVA_跨店調貨流向分析報表_${dateStr}.csv`,
+        };
+      case 'transfer_cases':
+        return {
+          content: generateTransferCasesCSV(scopedCases, stores),
+          filename: `KAVA_跨店調撥工單明細表_${dateStr}.csv`,
+        };
+      case 'inventory_matrix':
+        return {
+          content: generateInventoryMatrixCSV(scopedInventory, stores, products),
+          filename: `KAVA_門市庫存與承諾矩陣表_${dateStr}.csv`,
+        };
+      case 'audit_logs':
+        return {
+          content: generateAuditLogsCSV(logs),
+          filename: `KAVA_系統操作歷程記錄_${dateStr}.csv`,
+        };
       default:
-        return '自訂統計區間';
+        return { content: '', filename: 'export.csv' };
     }
   };
 
-  const handleDownload = () => {
-    if (selectedReports.length === 0) return;
-
-    // Format filename
-    const sTag = startDate.replace(/-/g, '');
-    const eTag = endDate.replace(/-/g, '');
-    const filename = `KAVA_營運分析報表_${sTag}_${eTag}.csv`;
-
-    const content = generateMultiSectionReportCSV({
-      selectedReports,
-      startDate,
-      endDate,
-      presetLabel: getPresetLabel(),
-      scopeLabel: getScopeName(),
-      metrics,
-      cases: scopedCases,
-      stores,
-      inventory: scopedInventory,
-      products,
-      logs,
-    });
-
+  const handleDownloadCSV = () => {
+    const { content, filename } = getReportCSV(selectedReport);
     downloadCSV(content, filename);
+    setDownloadSuccess(true);
     onLogExportAction(filename, 'LOCAL_CSV');
-    setDownloadSuccess(`已成功產出並下載「${filename}」 (包含 ${selectedReports.length} 份勾選報表)`);
-    setTimeout(() => {
-      setDownloadSuccess(null);
-      onClose();
-    }, 1800);
+    setTimeout(() => setDownloadSuccess(false), 4000);
   };
 
+  const handleUploadGoogleDrive = async () => {
+    setIsUploadingToDrive(true);
+    setDriveResult(null);
+    const { content, filename } = getReportCSV(selectedReport);
+
+    try {
+      const result = await uploadCsvToGoogleDrive(content, filename);
+      setDriveResult(result);
+      if (result.success) {
+        onLogExportAction(filename, 'GOOGLE_DRIVE');
+      }
+    } catch (err: any) {
+      setDriveResult({
+        success: false,
+        error: err.message || '無法連線至 Google Drive',
+      });
+    } finally {
+      setIsUploadingToDrive(false);
+    }
+  };
+
+  const reports = [
+    {
+      id: 'dashboard_summary' as ReportType,
+      title: '營運摘要 CSV',
+      desc: '含 6 大 KPI、各店庫存健康度、失衡成因與 AI 待辦總覽',
+      tag: '核心總覽',
+    },
+    {
+      id: 'inventory_warning' as ReportType,
+      title: '庫存警示 CSV',
+      desc: '含低庫存／即將缺貨風險排行、可售天數與立即處置建議',
+      tag: '缺貨預警',
+    },
+    {
+      id: 'ai_effectiveness' as ReportType,
+      title: 'AI 調貨成效 CSV',
+      desc: '含 4 階段轉化漏斗與近 5 個月 84.9% 有效率趨勢',
+      tag: '演算法成效',
+    },
+    {
+      id: 'transfer_flow' as ReportType,
+      title: '調貨流向 CSV',
+      desc: '含最近 30 天主要跨店調撥關係與成因網絡',
+      tag: '物流網絡',
+    },
+    {
+      id: 'transfer_cases' as ReportType,
+      title: '跨店工單明細 CSV',
+      desc: '含全工單編號、調出調入店、雙店確認時間、物流單號',
+      tag: '完整工單',
+    },
+    {
+      id: 'audit_logs' as ReportType,
+      title: '操作歷程與稽核 CSV',
+      desc: '含 AI 演算觸發、各店主管核准、物流派送與匯出時間戳',
+      tag: '稽核軌跡',
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in-50">
-      <div 
-        id="export-modal-container"
-        className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-[#E5E7EB] flex flex-col max-h-[90vh] overflow-hidden"
-      >
-        {/* Modal Header */}
-        <div className="bg-[#181C20] px-6 py-4.5 text-white flex items-center justify-between border-b border-[#2D353F]">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-[#E5E7EB] overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-6 bg-[#181C20] text-white flex items-center justify-between border-b border-[#2B323A]">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-[#FAF6EE] text-[#977334] rounded-lg">
-              <FileSpreadsheet className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-[#C5A059]/20 border border-[#C5A059]/40 flex items-center justify-center">
+              <FileSpreadsheet className="w-5 h-5 text-[#E8C683]" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-wider font-bold bg-[#C5A059] text-white px-2 py-0.5 rounded-full">
-                  CSV 匯出
-                </span>
-                <span className="text-xs text-[#9FA9B7]">內嵌 UTF-8 BOM 繁中相容格式</span>
-              </div>
-              <h3 className="text-lg font-bold text-white font-serif-heading">
-                {contextTitle ? `匯出報表：${contextTitle}` : '匯出營運分析報表'}
-              </h3>
+              <h2 className="text-lg font-bold font-serif-heading text-white">
+                匯出營運報表 & Google Drive 備份
+              </h2>
+              <p className="text-xs text-[#9CA3AF] mt-0.5">
+                支援 UTF-8 BOM 繁體中文相容 CSV 格式及 Google Drive 即時雲端同步
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#9CA3AF] hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-5">
-          {/* Success Notification Alert */}
-          {downloadSuccess && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-2.5 text-emerald-800 text-xs font-semibold shadow-sm animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{downloadSuccess}</span>
-            </div>
-          )}
-
-          {/* Section 1: 日期區間與門市範圍 */}
-          <div className="bg-[#F9FAFB] rounded-xl p-4 border border-[#E5E7EB] space-y-3.5">
-            <div className="text-xs font-bold text-[#1F2937] flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span>1. 設定統計週期與日期區間</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-              {/* Preset Period Dropdown */}
-              <div className="sm:col-span-4">
-                <label className="block text-[11px] font-medium text-[#6B7280] mb-1">
-                  週期快捷下拉選單
-                </label>
-                <select
-                  value={preset}
-                  onChange={(e) => handlePresetChange(e.target.value as PresetPeriod)}
-                  className="w-full bg-white border border-[#D1D5DB] rounded-lg px-3 py-2 text-xs text-[#1F2937] font-medium focus:ring-2 focus:ring-[#C5A059] focus:outline-none shadow-xs"
+        {/* Content Body */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Step 1: Select Report */}
+          <div>
+            <label className="text-xs font-bold text-[#374151] uppercase tracking-wider block mb-2.5">
+              步驟 1：選擇匯出報表格式 (支援 Excel 繁體中文)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {reports.map((rep) => (
+                <div
+                  key={rep.id}
+                  onClick={() => setSelectedReport(rep.id)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left flex flex-col justify-between ${
+                    selectedReport === rep.id
+                      ? 'bg-[#FBF8F1] border-[#C5A059] shadow-xs'
+                      : 'bg-white border-[#E5E7EB] hover:bg-[#F9FAFB]'
+                  }`}
                 >
-                  <option value="daily">📅 今日 (日報)</option>
-                  <option value="weekly">📅 近 7 天 (週報)</option>
-                  <option value="monthly">📊 近 30 天 (月報)</option>
-                  <option value="quarterly">📈 近 90 天 (季報)</option>
-                  <option value="custom">⚙️ 自訂起訖區間</option>
-                </select>
-              </div>
-
-              {/* Start Date */}
-              <div className="sm:col-span-4">
-                <label className="block text-[11px] font-medium text-[#6B7280] mb-1">
-                  起始日期
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    setPreset('custom');
-                  }}
-                  className="w-full bg-white border border-[#D1D5DB] rounded-lg px-3 py-1.5 text-xs text-[#1F2937] font-mono focus:ring-2 focus:ring-[#C5A059] focus:outline-none shadow-xs"
-                />
-              </div>
-
-              {/* End Date */}
-              <div className="sm:col-span-4">
-                <label className="block text-[11px] font-medium text-[#6B7280] mb-1">
-                  截止日期
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setPreset('custom');
-                  }}
-                  className="w-full bg-white border border-[#D1D5DB] rounded-lg px-3 py-1.5 text-xs text-[#1F2937] font-mono focus:ring-2 focus:ring-[#C5A059] focus:outline-none shadow-xs"
-                />
-              </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-bold ${selectedReport === rep.id ? 'text-[#8C6D3B]' : 'text-[#1F2937]'}`}>
+                        {rep.title}
+                      </span>
+                      {selectedReport === rep.id ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#8C6D3B]" />
+                      ) : (
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+                          {rep.tag}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
+                      {rep.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Scope Selection */}
-            <div className="pt-2 border-t border-[#E5E7EB] flex items-center justify-between">
-              <div className="text-[11px] text-[#6B7280] flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-[#6B7280]" />
-                <span>門市統計範圍：</span>
-              </div>
+          {/* Step 2: Scope Filter */}
+          <div>
+            <label className="text-xs font-bold text-[#374151] uppercase tracking-wider block mb-2.5">
+              步驟 2：選擇資料門市範圍
+            </label>
+            <div className="flex items-center space-x-2">
               <select
                 value={selectedScope}
                 onChange={(e) => setSelectedScope(e.target.value as ViewScope)}
-                className="bg-white border border-[#D1D5DB] rounded-lg px-3 py-1 text-xs text-[#1F2937] font-medium focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-lg px-3 py-2 text-xs font-medium text-[#1F2937] focus:ring-1 focus:ring-[#C5A059] focus:outline-none"
               >
-                <option value="all">全通路 (全部門市彙整)</option>
+                <option value="all">全通路 (合併檢視全台 5 處門市數據)</option>
                 {stores.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.code})
+                    {s.name} ({s.code}) - 店長：{s.manager}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Section 2: 選擇要匯出的報表項目 (Checkboxes) */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span>2. 勾選欲包含之報表項目（支援多選合併匯出）</span>
+          {/* Feedback & Drive Link Status */}
+          {downloadSuccess && (
+            <div className="bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl p-3.5 text-xs text-[#065F46] flex items-center space-x-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0" />
+              <span>CSV 檔案已成功下載至您的本機電腦！已配置 UTF-8 BOM，Excel 開啟文字不亂碼。</span>
+            </div>
+          )}
+
+          {driveResult && driveResult.success && (
+            <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl p-3.5 text-xs text-[#0369A1] flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0" />
+                <span>報表已成功備份至 Google Drive：<strong>{driveResult.fileName}</strong></span>
               </div>
-              <div className="flex items-center space-x-2 text-xs">
-                <button
-                  type="button"
-                  onClick={handleSelectAll}
-                  className="text-[#8C6D3B] hover:underline font-medium text-[11px]"
+              {driveResult.webLink && (
+                <a
+                  href={driveResult.webLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-1 text-xs font-bold text-[#0284C7] hover:underline shrink-0 ml-2"
                 >
-                  全選
-                </button>
-                <span className="text-[#D1D5DB]">|</span>
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  className="text-[#6B7280] hover:underline font-medium text-[11px]"
-                >
-                  清除
-                </button>
+                  <span>開啟雲端檔案</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </div>
+          )}
+
+          {driveResult && !driveResult.success && (
+            <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-3.5 text-xs text-[#991B1B] flex items-start space-x-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-[#EF4444] shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Google Drive 備份提示：</span>
+                <p className="mt-0.5">{driveResult.error}</p>
+                <p className="text-[11px] text-[#B91C1C] mt-1">您可直接點選「直接下載 CSV 檔案」取得完整報表。</p>
               </div>
             </div>
-
-            {/* Checkbox Items List */}
-            <div className="grid grid-cols-1 gap-2">
-              {reportOptions.map((opt) => {
-                const Icon = opt.icon;
-                const isChecked = selectedReports.includes(opt.key);
-                return (
-                  <div
-                    key={opt.key}
-                    onClick={() => handleToggleReport(opt.key)}
-                    className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
-                      isChecked
-                        ? 'bg-[#FAF7F0] border-[#C5A059] shadow-xs'
-                        : 'bg-white border-[#E5E7EB] hover:border-[#D1D5DB]'
-                    }`}
-                  >
-                    <div className="pt-0.5">
-                      {isChecked ? (
-                        <CheckSquare className="w-4 h-4 text-[#8C6D3B] fill-[#8C6D3B]/10" />
-                      ) : (
-                        <Square className="w-4 h-4 text-[#9CA3AF]" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-[#1F2937]">
-                            {opt.name}
-                          </span>
-                          <span className="text-[10px] font-mono font-semibold text-[#6B7280] bg-white px-1.5 py-0.2 rounded border border-[#E5E7EB]">
-                            {opt.code}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-medium text-[#8C6D3B] bg-white/80 px-2 py-0.5 rounded-full border border-[#EADBBD]">
-                          {opt.recommendedFor}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#6B7280] leading-relaxed">
-                        {opt.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="bg-[#F9FAFB] px-6 py-4 border-t border-[#E5E7EB] flex items-center justify-between">
-          <div className="text-xs text-[#6B7280]">
-            已勾選 <strong className="text-[#1F2937] font-bold">{selectedReports.length}</strong> / {reportOptions.length} 項報表
-          </div>
+        {/* Footer Actions */}
+        <div className="p-5 bg-[#F9FAFB] border-t border-[#E5E7EB] flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span className="text-[11px] text-[#6B7280]">
+            匯出檔名：<span className="font-mono text-[#374151]">{getReportCSV(selectedReport).filename}</span>
+          </span>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+            {/* Google Drive Upload Button */}
             <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-[#D1D5DB] rounded-xl text-xs font-medium text-[#4B5563] hover:bg-white transition-colors"
+              onClick={handleUploadGoogleDrive}
+              disabled={isUploadingToDrive}
+              className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 bg-white hover:bg-[#F3F4F6] text-[#374151] border border-[#D1D5DB] px-4 py-2 rounded-lg text-xs font-semibold shadow-xs transition-all disabled:opacity-60"
             >
-              取消
+              {isUploadingToDrive ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0284C7]" />
+                  <span>上傳 Google Drive 中...</span>
+                </>
+              ) : (
+                <>
+                  <CloudUpload className="w-3.5 h-3.5 text-[#0284C7]" />
+                  <span>備份至 Google Drive</span>
+                </>
+              )}
             </button>
 
+            {/* Direct Local CSV Download Button */}
             <button
-              type="button"
-              onClick={handleDownload}
-              disabled={selectedReports.length === 0}
-              className="flex items-center space-x-2 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleDownloadCSV}
+              className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 bg-[#8C6D3B] hover:bg-[#785D31] text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>立即下載報表 (CSV)</span>
+              <span>直接下載 CSV 報表</span>
             </button>
           </div>
         </div>
@@ -515,3 +366,4 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     </div>
   );
 };
+

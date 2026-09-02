@@ -67,7 +67,7 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
 
   const isSourceValid = sourceStoreId !== targetStoreId;
   const isStockSufficient = availableAtSource >= quantity && quantity > 0;
-  const canSubmit = isSourceValid && isStockSufficient;
+  const canSubmit = isSourceValid && quantity > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,13 +94,13 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
   };
 
   return (
-    <div className="p-3.5 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
       {/* Header */}
       <div>
         <div className="text-xs font-semibold text-[#8C6D3B] uppercase tracking-wider mb-1">
           人工發起 ｜ 雙店核准流程
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
+        <h1 className="text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
           建立跨店調貨申請
         </h1>
         <p className="text-xs lg:text-sm text-[#64748B] mt-1 leading-relaxed">
@@ -116,7 +116,7 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
       )}
 
       {/* Main Form Container */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E8EAEE] p-4 sm:p-6 md:p-8 shadow-xs space-y-5 sm:space-y-6">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E8EAEE] p-6 md:p-8 shadow-xs space-y-6">
         {/* Product Selection */}
         <div>
           <label className="block text-xs font-bold text-[#1F2633] mb-2 flex items-center gap-1.5">
@@ -225,7 +225,7 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
             {!isStockSufficient && (
               <p className="text-[11px] text-[#D9534F] mt-1.5 flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5" />
-                調出門市現有在架庫存不足，無法調撥指定數量。
+                調撥數量超過目前可售庫存，仍可建立「超額需求／待補足」申請，供後續人工協調。
               </p>
             )}
           </div>
@@ -298,10 +298,11 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
             }`}
           >
             <PlusCircle className="w-4 h-4" />
-            <span>正式送出調貨申請</span>
+            <span>{isStockSufficient ? '正式送出調貨申請' : '建立超額需求申請'}</span>
           </button>
         </div>
       </form>
     </div>
   );
 };
+
