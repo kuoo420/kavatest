@@ -11,7 +11,10 @@ import {
   Building2,
   Calendar,
   Sparkles,
-  Send
+  Send,
+  Camera,
+  MessageSquare,
+  Check
 } from 'lucide-react';
 import { TransferCase, Store, Product, UserRole } from '../types';
 
@@ -122,7 +125,81 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
             </div>
           </div>
 
-          {/* V1.2 Dual Confirmation Status Card */}
+            {/* Prescription Tier Status (If applicable) */}
+            {caseItem.prescriptionAction && (
+              <div className="bg-[#FFFDF9] rounded-xl p-4 border border-[#EADBBD] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#8C6D3B] flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#C5A059]" />
+                    AI 多階梯庫存處方方案
+                  </span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FAF3E0] text-[#8C6D3B] border border-[#EADBBD]">
+                    {caseItem.prescriptionAction === 'vm_display' && '階梯 1：陳列優化與搭售話術'}
+                    {caseItem.prescriptionAction === 'gwp_gift' && '階梯 2：VIP 滿額贈禮轉化'}
+                    {caseItem.prescriptionAction === 'transfer' && '階梯 3：跨店正價調撥'}
+                    {caseItem.prescriptionAction === 'none' && '維持現狀'}
+                  </span>
+                </div>
+                <div className="text-xs text-[#554F49] space-y-2">
+                  {caseItem.prescriptionStatus === 'vm_observing' && (
+                    <p className="text-[#3A3530] leading-relaxed">
+                      已執行陳列位調整與搭售話術配置，目前進入 7 天閉環演算法觀察期（剩餘 {caseItem.observationDaysRemaining || 7} 天）。
+                    </p>
+                  )}
+                  {caseItem.prescriptionStatus === 'gwp_applied' && (
+                    <p className="text-[#3A3530] leading-relaxed">
+                      已套用全連鎖同價滿額贈 (GWP) 方案，在維持全國統一售價前提下加速動能。
+                    </p>
+                  )}
+                  {caseItem.prescriptionStatus === 'transfer_initiated' && (
+                    <p className="text-[#3A3530] leading-relaxed">
+                      已完成前置診斷評估，正式發起跨店調撥流程以平衡雙店庫存水位。
+                    </p>
+                  )}
+
+                  {/* Photo Proof Display if available */}
+                  {caseItem.vmPhotoProofUrl && (
+                    <div className="mt-2 p-2.5 bg-white rounded-lg border border-[#E2E8F0] space-y-1.5">
+                      <div className="flex items-center justify-between font-bold text-[11px] text-[#2563EB]">
+                        <span className="flex items-center gap-1">
+                          <Camera className="w-3.5 h-3.5" />
+                          門市拍照存證紀錄
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-normal">
+                          {caseItem.vmVerifiedAt} · {caseItem.vmVerifiedBy}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <img 
+                          src={caseItem.vmPhotoProofUrl} 
+                          alt="陳列佐證" 
+                          className="w-20 h-16 rounded-md object-cover border border-[#CBD5E1]"
+                        />
+                        <div className="text-[11px] text-[#475569] leading-tight space-y-0.5">
+                          <div className="font-semibold text-[#1E293B]">已鎖定 7 天閉環觀察</div>
+                          <div>{caseItem.vmGuidance || '已調整至中島試戴鏡旁展盤'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sales Pitch Guidance */}
+                  {caseItem.salesPitchDetail && (
+                    <div className="p-2.5 bg-[#F0FDF4] rounded-lg border border-[#BBF7D0] text-[11px] space-y-1">
+                      <div className="font-bold text-[#065F46] flex items-center gap-1">
+                        <MessageSquare className="w-3.5 h-3.5 text-[#059669]" />
+                        <span>AI 推薦搭配熱銷款：{caseItem.salesPitchDetail.recommendedPairName}</span>
+                      </div>
+                      <div className="text-[#047857] italic">
+                        {caseItem.salesPitchDetail.iceBreakerScript}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* V1.2 Dual Confirmation Status Card */}
           <div className="bg-white rounded-xl border border-[#E5E7EB] p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <span className="font-bold text-[#1F2937] flex items-center gap-1.5">

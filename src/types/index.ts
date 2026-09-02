@@ -75,6 +75,33 @@ export interface TransferCase {
   createdAt: string;
   updatedAt: string;
   remarks?: string;
+
+  // AI 庫存處方籤相關欄位 (連鎖店價格一致性規範)
+  prescriptionStatus?: 'pending' | 'vm_observing' | 'gwp_applied' | 'transfer_initiated' | 'skipped';
+  prescriptionAction?: 'vm_display' | 'gwp_gift' | 'transfer' | 'none';
+  vmGuidance?: string; // 視覺陳列調整指引
+  salesPitchGuidance?: string; // 門市成套疊戴話術
+  gwpGuidance?: string; // VIP滿額贈禮轉化指引
+  observationDaysRemaining?: number; // 觀察期剩餘天數 (預設 7 天)
+  diagnosis?: string; // 庫存診斷說明
+  vmPhotoProofUrl?: string; // 陳列調整佐證照片 (Base64 或 URL)
+  vmVerifiedAt?: string; // 陳列拍照驗證時間戳
+  vmVerifiedBy?: string; // 拍照驗證人員
+  salesPitchDetail?: {
+    recommendedPairSku?: string; // 推薦搭售熱銷品 SKU
+    recommendedPairName?: string; // 推薦搭售熱銷品名稱
+    styleLogic?: string; // 美學與層次搭配邏輯
+    targetPersona?: string; // 目標客群與痛點
+    iceBreakerScript?: string; // 破冰推薦句
+    priceOvercomeScript?: string; // 價格與正價價值化解句
+    crossSellRateLift?: string; // 歷史連帶結帳率提升指標
+  };
+  unitEconomics?: {
+    fullPrice: number;
+    transferCost: number;
+    expectedNetMargin: number;
+    fullPriceRevenue: number;
+  };
 }
 
 export interface AuditLog {
@@ -82,7 +109,18 @@ export interface AuditLog {
   timestamp: string;
   operator: string;
   roleTitle: string;
-  actionType: 'AI_ADOPT' | 'TRANSFER_CREATE' | 'STORE_APPROVE' | 'STORE_REJECT' | 'DISPATCH' | 'RECEIVE' | 'EXPORT_CSV' | 'DRIVE_BACKUP';
+  actionType: 
+    | 'AI_ADOPT' 
+    | 'TRANSFER_CREATE' 
+    | 'STORE_APPROVE' 
+    | 'STORE_REJECT' 
+    | 'DISPATCH' 
+    | 'RECEIVE' 
+    | 'EXPORT_CSV' 
+    | 'DRIVE_BACKUP'
+    | 'PRESCRIPTION_VM'
+    | 'PRESCRIPTION_GWP'
+    | 'PRESCRIPTION_TRANSFER';
   title: string;
   details: string;
   targetId?: string;

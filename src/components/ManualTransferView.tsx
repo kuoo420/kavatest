@@ -94,13 +94,13 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
+    <div className="p-3.5 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       {/* Header */}
       <div>
         <div className="text-xs font-semibold text-[#8C6D3B] uppercase tracking-wider mb-1">
           人工發起 ｜ 雙店核准流程
         </div>
-        <h1 className="text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1C232E] tracking-tight font-serif-heading">
           建立跨店調貨申請
         </h1>
         <p className="text-xs lg:text-sm text-[#64748B] mt-1 leading-relaxed">
@@ -116,7 +116,7 @@ export const ManualTransferView: React.FC<ManualTransferViewProps> = ({
       )}
 
       {/* Main Form Container */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E8EAEE] p-6 md:p-8 shadow-xs space-y-6">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E8EAEE] p-4 sm:p-6 md:p-8 shadow-xs space-y-5 sm:space-y-6">
         {/* Product Selection */}
         <div>
           <label className="block text-xs font-bold text-[#1F2633] mb-2 flex items-center gap-1.5">

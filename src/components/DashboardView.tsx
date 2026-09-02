@@ -192,9 +192,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
 
   return (
-    <div className="p-6 md:p-8 max-w-[1440px] mx-auto space-y-5 animate-in fade-in duration-200">
+    <div className="p-3.5 sm:p-6 md:p-8 max-w-[1440px] mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-200">
       {/* 營運判讀 Notice Bar (Matching provided design) */}
-      <div className="bg-[#EEE6DF] border border-[#DDD1C6] rounded-xl px-4 py-3 text-xs text-[#24211F] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+      <div className="bg-[#EEE6DF] border border-[#DDD1C6] rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs text-[#24211F] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
         <div className="flex items-center space-x-2">
           <span className="font-bold text-[#8C6D3B] flex items-center gap-1 shrink-0">
             <Activity className="w-3.5 h-3.5" />
@@ -214,7 +214,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 6 大核心 KPI 卡片 (Matching V2 specifications) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
         {/* KPI 1: 總庫存 */}
         <div className="bg-[#FFFDF9] border border-[#DED6CF] rounded-2xl p-4 shadow-xs hover:border-[#927665] transition-all">
           <div className="text-[11px] text-[#7C756F] font-medium">總庫存</div>

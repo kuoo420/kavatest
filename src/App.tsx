@@ -56,6 +56,7 @@ export default function App() {
   const [prefilledProduct, setPrefilledProduct] = useState<Product | null>(null);
   const [prefilledTargetStoreId, setPrefilledTargetStoreId] = useState<string | undefined>(undefined);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleOpenExportModal = (
     preset: PresetPeriod = 'monthly',
@@ -96,7 +97,7 @@ export default function App() {
     setLogs((prev) => [newLog, ...prev]);
   };
 
-  // 1. Adopt AI Recommendation
+  // 1. Adopt AI Recommendation (Initiate Transfer)
   const handleAdoptAIRecommendation = (caseId: string) => {
     const targetCase = cases.find((c) => c.id === caseId);
     if (!targetCase) return;
@@ -106,9 +107,11 @@ export default function App() {
         return {
           ...c,
           status: 'waiting_source' as const,
+          prescriptionStatus: 'transfer_initiated' as const,
+          prescriptionAction: 'transfer' as const,
           pendingStoreId: c.sourceStoreId,
           updatedAt: new Date().toLocaleString('zh-TW'),
-          remarks: '已由門市/管理者採用 AI 推薦，發送給調出店進行出庫核准。',
+          remarks: '已由門市/管理者啟動跨店正價調撥，發送給調出店進行出庫核准。',
         };
       }
       return c;
@@ -116,9 +119,73 @@ export default function App() {
 
     setCases(updated);
     addAuditLog(
-      'AI_ADOPT',
-      `採用 AI 調撥建議 ${targetCase.caseNumber}`,
-      `已採用 ${targetCase.productName} 跨店調撥建議，並進入調出店核准流程。`,
+      'PRESCRIPTION_TRANSFER',
+      `啟動跨店正價調撥 ${targetCase.caseNumber}`,
+      `已啟動 ${targetCase.productName} 跨店正價調撥工單，送交調出店核准出庫。`,
+      targetCase.caseNumber,
+      'success'
+    );
+  };
+
+  // 1b. Adopt VM Prescription (7-day observing with Photo Verification)
+  const handleAdoptPrescriptionVM = (caseId: string, photoProofUrl?: string) => {
+    const targetCase = cases.find((c) => c.id === caseId);
+    if (!targetCase) return;
+
+    const verifiedAt = new Date().toLocaleString('zh-TW');
+    const storeObj = stores.find((s) => s.id === targetCase.sourceStoreId);
+    const verifiedBy = storeObj ? `${storeObj.name}店長` : '專櫃人員';
+
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              prescriptionStatus: 'vm_observing' as const,
+              prescriptionAction: 'vm_display' as const,
+              observationDaysRemaining: 7,
+              vmPhotoProofUrl: photoProofUrl || c.vmPhotoProofUrl,
+              vmVerifiedAt: verifiedAt,
+              vmVerifiedBy: verifiedBy,
+              updatedAt: verifiedAt,
+              remarks: '門市已拍照上傳存證「視覺陳列優化與疊戴推薦話術」，進入 7 天觀察鎖定期。',
+            }
+          : c
+      )
+    );
+
+    addAuditLog(
+      'PRESCRIPTION_VM',
+      `拍照存證採用陳列處方 ${targetCase.caseNumber}`,
+      `門市已完成 ${targetCase.productName} 現場陳列拍照上傳與搭售話術配置，進入 7 天閉環演算法觀察期。`,
+      targetCase.caseNumber,
+      'info'
+    );
+  };
+
+  // 1c. Adopt GWP Prescription
+  const handleAdoptPrescriptionGWP = (caseId: string) => {
+    const targetCase = cases.find((c) => c.id === caseId);
+    if (!targetCase) return;
+
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              prescriptionStatus: 'gwp_applied' as const,
+              prescriptionAction: 'gwp_gift' as const,
+              updatedAt: new Date().toLocaleString('zh-TW'),
+              remarks: '已申請轉為門市 VIP 滿額限定禮標的。',
+            }
+          : c
+      )
+    );
+
+    addAuditLog(
+      'PRESCRIPTION_GWP',
+      `申請滿額贈禮轉化 ${targetCase.caseNumber}`,
+      `已將 ${targetCase.productName} 申請轉化為專櫃 VIP 滿額贈禮標的，保全正價品牌價值。`,
       targetCase.caseNumber,
       'success'
     );
@@ -447,8 +514,8 @@ export default function App() {
   };
 
   return (
-    <div id="kava-app-root" className="flex min-h-screen bg-[#F8F7F4] text-[#1E252B] font-sans">
-      {/* Dark Sidebar */}
+    <div id="kava-app-root" className="flex min-h-screen bg-[#F8F7F4] text-[#1E252B] font-sans relative">
+      {/* Dark Sidebar (Desktop persistent + Mobile slide-over) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -457,10 +524,12 @@ export default function App() {
         stores={stores}
         pendingCount={inProgressCount}
         aiCount={aiPendingCount}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
         {/* Top Navbar */}
         <TopNavbar
           currentTab={currentTab}
@@ -472,10 +541,11 @@ export default function App() {
           onOpenExportModal={() => handleOpenExportModal('monthly', ['health', 'ai_effectiveness', 'inventory_risk', 'transfer_cases'])}
           onRefreshData={handleRefresh}
           isRefreshing={isRefreshing}
+          onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
         {/* Dynamic Tab Views */}
-        <main className="flex-1 pb-16">
+        <main className="flex-1 pb-8">
           {currentTab === 'dashboard' && (
             <DashboardView
               cases={cases}
@@ -499,6 +569,8 @@ export default function App() {
               userRole={userRole}
               viewScope={viewScope}
               onAdoptRecommendation={handleAdoptAIRecommendation}
+              onAdoptPrescriptionVM={handleAdoptPrescriptionVM}
+              onAdoptPrescriptionGWP={handleAdoptPrescriptionGWP}
               onRejectRecommendation={handleRejectTransfer}
               onSelectCase={setSelectedCaseForDetail}
               onOpenExportModal={handleOpenExportModal}
@@ -575,6 +647,63 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Mobile Bottom Quick Navigation Bar (Sticky at bottom on phones/tablets) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#16181B] border-t border-[#2A3038] px-2 py-1.5 flex items-center justify-around shadow-2xl backdrop-blur-md">
+        <button
+          onClick={() => setCurrentTab('dashboard')}
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-medium transition-colors ${
+            currentTab === 'dashboard' ? 'text-[#E5C482]' : 'text-[#8E99A8] hover:text-[#D1D5DB]'
+          }`}
+        >
+          <span className="text-base leading-none mb-0.5">📊</span>
+          <span>儀表板</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('ai_recommendations')}
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-medium transition-colors relative ${
+            currentTab === 'ai_recommendations' ? 'text-[#E5C482]' : 'text-[#8E99A8] hover:text-[#D1D5DB]'
+          }`}
+        >
+          <span className="text-base leading-none mb-0.5">✨</span>
+          <span>AI 處方</span>
+          {aiPendingCount > 0 && (
+            <span className="absolute top-0 right-1 w-2 h-2 bg-[#D97706] rounded-full ring-2 ring-[#16181B]"></span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('transfers')}
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-medium transition-colors relative ${
+            currentTab === 'transfers' ? 'text-[#E5C482]' : 'text-[#8E99A8] hover:text-[#D1D5DB]'
+          }`}
+        >
+          <span className="text-base leading-none mb-0.5">🔄</span>
+          <span>調貨工單</span>
+          {inProgressCount > 0 && (
+            <span className="absolute top-0 right-1 w-2 h-2 bg-[#B45309] rounded-full ring-2 ring-[#16181B]"></span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('inventory')}
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-medium transition-colors ${
+            currentTab === 'inventory' ? 'text-[#E5C482]' : 'text-[#8E99A8] hover:text-[#D1D5DB]'
+          }`}
+        >
+          <span className="text-base leading-none mb-0.5">📦</span>
+          <span>全店庫存</span>
+        </button>
+
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-medium text-[#8E99A8] hover:text-[#D1D5DB] transition-colors"
+        >
+          <span className="text-base leading-none mb-0.5">☰</span>
+          <span>更多</span>
+        </button>
+      </nav>
 
       {/* Export Multi-Section Modal */}
       <ExportModal
