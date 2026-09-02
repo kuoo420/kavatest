@@ -7,6 +7,7 @@ export type NavigationTab =
   | 'ai_recommendations' 
   | 'manual_transfer'
   | 'transfers' 
+  | 'ship_from_store'
   | 'inventory' 
   | 'history';
 
@@ -119,8 +120,15 @@ export interface AuditLog {
     | 'EXPORT_CSV' 
     | 'DRIVE_BACKUP'
     | 'PRESCRIPTION_VM'
+    | 'VM_OBSERVE_RESOLVE'
+    | 'VM_OBSERVE_ESCALATE'
     | 'PRESCRIPTION_GWP'
-    | 'PRESCRIPTION_TRANSFER';
+    | 'GWP_HQ_APPROVE'
+    | 'GWP_HQ_REJECT'
+    | 'PRESCRIPTION_TRANSFER'
+    | 'ECOMMERCE_ORDER_ROUTED'
+    | 'STORE_SHIP_PICKED'
+    | 'STORE_SHIP_DISPATCHED';
   title: string;
   details: string;
   targetId?: string;
@@ -135,4 +143,34 @@ export interface DashboardMetrics {
   activeSkuCount: number;
   storePendingMap: Record<string, number>;
 }
+
+export type ShipOrderStatus = 'pending_pick' | 'picked_packed' | 'dispatched' | 'delivered';
+
+export interface ShipFromStoreOrder {
+  id: string;
+  orderNumber: string; // e.g. EC-20260902-881
+  customerName: string; // e.g. 王*華
+  customerPhone: string;
+  shippingAddress: string;
+  productId: string;
+  productSku: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  assignedStoreId: string; // e.g. S01 一中店
+  assignedReason: string; // e.g. 總倉缺貨(0件)，AI 智慧尋源：西門店滯銷優先消呆 / 一中店地緣最近
+  status: ShipOrderStatus;
+  createdAt: string;
+  dueTime: string; // e.g. 2 小時內出貨
+  courier: string;
+  trackingNumber?: string;
+  notificationSent: {
+    ipadPos: boolean;
+    lineNotify: boolean;
+    sms: boolean;
+  };
+  pickedAt?: string;
+  dispatchedAt?: string;
+}
+
 

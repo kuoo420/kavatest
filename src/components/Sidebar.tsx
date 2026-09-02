@@ -2,8 +2,9 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Sparkles, 
-  PlusCircle,
+  PlusCircle, 
   ArrowLeftRight, 
+  Truck,
   Box, 
   RotateCcw,
   ShieldCheck,
@@ -20,6 +21,7 @@ interface SidebarProps {
   stores: Store[];
   pendingCount: number;
   aiCount: number;
+  sfsCount?: number;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
@@ -32,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   stores,
   pendingCount,
   aiCount,
+  sfsCount = 0,
   isOpenMobile = false,
   onCloseMobile,
 }) => {
@@ -71,6 +74,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ArrowLeftRight,
       badge: pendingCount > 0 ? pendingCount : undefined,
       badgeColor: 'bg-[#967746] text-white',
+    },
+    {
+      id: 'ship_from_store' as NavigationTab,
+      label: '門市代發 (SFS)',
+      icon: Truck,
+      badge: sfsCount > 0 ? sfsCount : undefined,
+      badgeColor: 'bg-[#D97706] text-white',
     },
     {
       id: 'inventory' as NavigationTab,

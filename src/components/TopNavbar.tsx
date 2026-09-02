@@ -67,6 +67,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         return '人工跨店調貨';
       case 'transfers':
         return '調貨申請與工單管理';
+      case 'ship_from_store':
+        return '門市代發貨 (Ship-from-Store)';
       case 'inventory':
         return '全通路庫存與承諾分析';
       case 'history':

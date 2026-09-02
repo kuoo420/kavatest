@@ -5,6 +5,7 @@ import { DashboardView } from './components/DashboardView';
 import { AIRecommendationsView } from './components/AIRecommendationsView';
 import { ManualTransferView } from './components/ManualTransferView';
 import { TransferManagementView } from './components/TransferManagementView';
+import { ShipFromStoreView } from './components/ShipFromStoreView';
 import { InventoryView } from './components/InventoryView';
 import { AuditLogView } from './components/AuditLogView';
 import { ExportModal, PresetPeriod } from './components/ExportModal';
@@ -15,7 +16,8 @@ import {
   PRODUCTS, 
   INITIAL_INVENTORY, 
   INITIAL_TRANSFER_CASES, 
-  INITIAL_AUDIT_LOGS 
+  INITIAL_AUDIT_LOGS,
+  INITIAL_SHIP_FROM_STORE_ORDERS
 } from './data/mockData';
 import { 
   NavigationTab, 
@@ -25,7 +27,8 @@ import {
   StoreInventory, 
   AuditLog, 
   Product,
-  DashboardMetrics 
+  DashboardMetrics,
+  ShipFromStoreOrder
 } from './types';
 
 export default function App() {
@@ -38,6 +41,7 @@ export default function App() {
   const [inventory, setInventory] = useState<StoreInventory[]>(INITIAL_INVENTORY);
   const [cases, setCases] = useState<TransferCase[]>(INITIAL_TRANSFER_CASES);
   const [logs, setLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
+  const [shipFromStoreOrders, setShipFromStoreOrders] = useState<ShipFromStoreOrder[]>(INITIAL_SHIP_FROM_STORE_ORDERS);
 
   // Modals state
   const [exportModalConfig, setExportModalConfig] = useState<{
@@ -189,6 +193,145 @@ export default function App() {
       targetCase.caseNumber,
       'success'
     );
+  };
+
+  // 1d. HQ Approves GWP conversion
+  const handleApproveGWPConversion = (caseId: string) => {
+    const targetCase = cases.find((c) => c.id === caseId);
+    if (!targetCase) return;
+
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              status: 'completed' as const,
+              prescriptionStatus: 'gwp_applied' as const,
+              prescriptionAction: 'gwp_gift' as const,
+              pendingStoreId: undefined,
+              updatedAt: new Date().toLocaleString('zh-TW'),
+              remarks: '總公司商品部已核准轉化為專櫃 VIP 滿額限定贈禮，已從可售帳扣抵為行銷贈品庫存。',
+            }
+          : c
+      )
+    );
+
+    // Update inventory to reflect marketing gift stock commitment
+    setInventory((prev) =>
+      prev.map((inv) => {
+        if (inv.storeId === targetCase.sourceStoreId && inv.productId === targetCase.productId) {
+          return {
+            ...inv,
+            availableStock: Math.max(0, inv.availableStock - targetCase.quantity),
+            committedStock: inv.committedStock + targetCase.quantity,
+          };
+        }
+        return inv;
+      })
+    );
+
+    addAuditLog(
+      'GWP_HQ_APPROVE',
+      `總部核准滿額禮轉化 ${targetCase.caseNumber}`,
+      `總公司已核准 ${targetCase.productName}（${targetCase.quantity} 件）轉為專櫃 VIP 滿額贈禮標的，已完成帳面轉列。`,
+      targetCase.caseNumber,
+      'success'
+    );
+
+    setSelectedCaseForDetail(null);
+  };
+
+  // 1e. HQ Rejects GWP and escalates back to inter-store transfer
+  const handleRejectGWPConversion = (caseId: string) => {
+    const targetCase = cases.find((c) => c.id === caseId);
+    if (!targetCase) return;
+
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              prescriptionStatus: 'transfer_initiated' as const,
+              prescriptionAction: 'transfer' as const,
+              status: 'waiting_source' as const,
+              pendingStoreId: c.sourceStoreId,
+              updatedAt: new Date().toLocaleString('zh-TW'),
+              remarks: '總部覆核：調入店斷貨急需，駁回滿額禮申請，升級啟動跨店正價調撥流程。',
+            }
+          : c
+      )
+    );
+
+    addAuditLog(
+      'GWP_HQ_REJECT',
+      `駁回滿額禮申請，升級調撥 ${targetCase.caseNumber}`,
+      `因調入門市正價急需，總公司已駁回 ${targetCase.productName} 之滿額禮轉化申請，恢復跨店調撥審核。`,
+      targetCase.caseNumber,
+      'warning'
+    );
+
+    setSelectedCaseForDetail(null);
+  };
+
+  // 1f. End VM observation early and escalate to inter-store transfer
+  const handleEscalateVMToTransfer = (caseId: string) => {
+    const targetCase = cases.find((c) => c.id === caseId);
+    if (!targetCase) return;
+
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              prescriptionStatus: 'transfer_initiated' as const,
+              prescriptionAction: 'transfer' as const,
+              status: 'waiting_source' as const,
+              pendingStoreId: c.sourceStoreId,
+              updatedAt: new Date().toLocaleString('zh-TW'),
+              remarks: '已結束 7 天陳列觀察期，原店動銷仍未達標，系統升級啟動跨店正價調撥流程。',
+            }
+          : c
+      )
+    );
+
+    addAuditLog(
+      'VM_OBSERVE_ESCALATE',
+      `結束觀察期，升級跨店調撥 ${targetCase.caseNumber}`,
+      `${targetCase.productName} 經原店陳列話術測試後，升級啟動跨店正價調撥（${targetCase.sourceStoreId} → ${targetCase.targetStoreId}）。`,
+      targetCase.caseNumber,
+      'info'
+    );
+
+    setSelectedCaseForDetail(null);
+  };
+
+  // 1g. Mark VM observation resolved (sold locally, cancel transfer)
+  const handleResolveVMSuccess = (caseId: string) => {
+    const targetCase = cases.find((c) => c.id === caseId);
+    if (!targetCase) return;
+
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              status: 'completed' as const,
+              updatedAt: new Date().toLocaleString('zh-TW'),
+              remarks: '原店陳列與疊戴搭售成效顯著，原店已成功售出，自動結案免調貨。',
+            }
+          : c
+      )
+    );
+
+    addAuditLog(
+      'VM_OBSERVE_RESOLVE',
+      `原店動銷成功，免調貨結案 ${targetCase.caseNumber}`,
+      `${targetCase.productName} 透過陳列優化與搭售話術於原店成功售出，結案解除跨店調撥。`,
+      targetCase.caseNumber,
+      'success'
+    );
+
+    setSelectedCaseForDetail(null);
   };
 
   // 2. Reject/Dismiss Recommendation or Transfer
@@ -477,6 +620,128 @@ export default function App() {
     setIsNewTransferModalOpen(true);
   };
 
+  // 10. Ship-from-Store (SFS) Order Status Update
+  const handleUpdateShipOrderStatus = (
+    orderId: string, 
+    newStatus: ShipFromStoreOrder['status'],
+    trackingNumber?: string
+  ) => {
+    const order = shipFromStoreOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setShipFromStoreOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        return {
+          ...o,
+          status: newStatus,
+          trackingNumber: trackingNumber || o.trackingNumber,
+          pickedAt: newStatus === 'picked_packed' ? new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : o.pickedAt,
+        };
+      }
+      return o;
+    }));
+
+    // If dispatched, deduct committed stock and physical stock
+    if (newStatus === 'dispatched') {
+      setInventory(prev => prev.map(inv => {
+        if (inv.storeId === order.assignedStoreId && inv.productId === order.productId) {
+          return {
+            ...inv,
+            committedStock: Math.max(0, inv.committedStock - order.quantity),
+            physicalStock: Math.max(0, inv.physicalStock - order.quantity),
+          };
+        }
+        return inv;
+      }));
+
+      addAuditLog(
+        'STORE_SHIP_DISPATCHED',
+        `門市代發出貨完成 ${order.orderNumber}`,
+        `${stores.find(s => s.id === order.assignedStoreId)?.name || '指派門市'} 已完成包裝並交由黑貓物流派送（單號：${trackingNumber || order.trackingNumber || 'TC-9988231'}）。已扣除門市實體庫存與鎖定。`,
+        order.orderNumber,
+        'success'
+      );
+    } else if (newStatus === 'picked_packed') {
+      addAuditLog(
+        'STORE_SHIP_PICKED',
+        `門市完成揀貨核銷 ${order.orderNumber}`,
+        `${stores.find(s => s.id === order.assignedStoreId)?.name || '指派門市'} 專櫃人員已清點現貨並放入電商專用出貨袋。`,
+        order.orderNumber,
+        'info'
+      );
+    }
+  };
+
+  // 11. Simulate new E-commerce order with intelligent SFS Sourcing & Stock Locking
+  const handleSimulateNewEcommerceOrder = (
+    productId: string, 
+    preferredStoreId?: string
+  ) => {
+    const targetProduct = products.find(p => p.id === productId) || products[0];
+    
+    // Find candidate store: prioritize stores with available stock
+    const availableStores = inventory
+      .filter(inv => inv.productId === targetProduct.id && inv.availableStock > 0)
+      .sort((a, b) => b.availableStock - a.availableStock);
+
+    let assignedStore = preferredStoreId 
+      ? stores.find(s => s.id === preferredStoreId) 
+      : (availableStores[0] ? stores.find(s => s.id === availableStores[0].storeId) : stores.find(s => s.id === 'S03'));
+
+    if (!assignedStore) {
+      assignedStore = stores[1]; // fallback 一中店
+    }
+
+    const newOrderId = `sfs-${Date.now()}`;
+    const orderNum = `ORD-2026${Math.floor(10000 + Math.random() * 90000)}`;
+
+    // Real Stock Locking: decrement available stock and increment committed stock for that store!
+    setInventory(prev => prev.map(inv => {
+      if (inv.storeId === assignedStore!.id && inv.productId === targetProduct.id) {
+        return {
+          ...inv,
+          availableStock: Math.max(0, inv.availableStock - 1),
+          committedStock: inv.committedStock + 1,
+        };
+      }
+      return inv;
+    }));
+
+    const newOrder: ShipFromStoreOrder = {
+      id: newOrderId,
+      orderNumber: orderNum,
+      customerName: '李小姐 (官網會員)',
+      customerPhone: '0988-***-123',
+      shippingAddress: '台中市西屯區台灣大道三段99號',
+      productId: targetProduct.id,
+      productSku: targetProduct.sku,
+      productName: targetProduct.name,
+      quantity: 1,
+      price: targetProduct.price,
+      assignedStoreId: assignedStore.id,
+      assignedReason: `總倉無現貨，AI 演算法比對各門市，評估 ${assignedStore.name} 具備在架現貨且同區銷速與消呆評分最佳（98.2分），指派由門市代發！`,
+      status: 'pending_pick',
+      createdAt: new Date().toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' }) + ' ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+      dueTime: '2 小時內完成揀貨包裝',
+      courier: '黑貓宅急便',
+      notificationSent: {
+        ipadPos: true,
+        lineNotify: true,
+        sms: true,
+      },
+    };
+
+    setShipFromStoreOrders(prev => [newOrder, ...prev]);
+
+    addAuditLog(
+      'ECOMMERCE_ORDER_ROUTED',
+      `官網訂單生成，門市庫存即時鎖定 ${orderNum}`,
+      `顧客於電商購買【${targetProduct.name}】，總倉無貨，AI 自動尋源指派【${assignedStore.name}】代發。該店可用庫存 -1，鎖定庫存 🔒 +1。系統已向專櫃 iPad 及 LINE 官方推播發貨任務通知。`,
+      orderNum,
+      'warning'
+    );
+  };
+
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
@@ -492,6 +757,7 @@ export default function App() {
   const bothConfirmedCount = cases.filter(
     (c) => c.status === 'both_confirmed' || c.status === 'in_transit'
   ).length;
+  const sfsPendingCount = shipFromStoreOrders.filter((o) => o.status !== 'dispatched').length;
   const totalAvailableStock = inventory.reduce((sum, inv) => sum + inv.availableStock, 0);
 
   const storePendingMap: Record<string, number> = {};
@@ -524,6 +790,7 @@ export default function App() {
         stores={stores}
         pendingCount={inProgressCount}
         aiCount={aiPendingCount}
+        sfsCount={sfsPendingCount}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
@@ -624,6 +891,18 @@ export default function App() {
               onDispatchCourier={handleDispatchCourier}
               onCompleteTransfer={handleCompleteTransfer}
               onOpenExportModal={handleOpenExportModal}
+            />
+          )}
+
+          {currentTab === 'ship_from_store' && (
+            <ShipFromStoreView
+              orders={shipFromStoreOrders}
+              stores={stores}
+              products={products}
+              userRole={userRole}
+              viewScope={viewScope}
+              onUpdateOrderStatus={handleUpdateShipOrderStatus}
+              onSimulateNewEcommerceOrder={handleSimulateNewEcommerceOrder}
             />
           )}
 
@@ -733,6 +1012,10 @@ export default function App() {
         onDispatchCourier={handleDispatchCourier}
         onCompleteTransfer={handleCompleteTransfer}
         onRejectTransfer={handleRejectTransfer}
+        onApproveGWP={handleApproveGWPConversion}
+        onRejectGWP={handleRejectGWPConversion}
+        onEscalateVM={handleEscalateVMToTransfer}
+        onResolveVM={handleResolveVMSuccess}
       />
 
       {/* New Manual Transfer Creation Modal */}
